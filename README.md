@@ -1,4 +1,4 @@
-[README.md](https://github.com/user-attachments/files/25047037/README.md)
+[README-2.md](https://github.com/user-attachments/files/25047263/README-2.md)
 # 🚼 אתגר העגלה: הגרסה התל אביבית
 
 משחק פיקסל ארט בסגנון רטרו על אמא עם עגלה שמנסה לשרוד את מכשולי המדרכה של תל אביב!
@@ -68,14 +68,6 @@
 - **Vanilla JavaScript** - לוגיקת המשחק
 - **CSS3** - עיצוב וממשק
 - **LocalStorage** - שמירת שיא
-
-## 📸 צילומי מסך
-
-### מסך התחלה
-![Start Screen](screenshot-start.png)
-
-### משחק
-![Gameplay](screenshot-game.png)
 
 ## 🎨 קרדיטים
 
