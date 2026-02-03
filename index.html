@@ -302,21 +302,33 @@
                 left: 0;
             }
             
-            /* Compact score overlay - ALWAYS ON TOP */
+            /* Compact score overlay - ALWAYS ON TOP with better visibility */
             .ui-overlay {
-                background: rgba(0,0,0,0.8) !important;
-                padding: 6px 12px !important;
-                font-size: 11px !important;
+                background: rgba(0,0,0,0.9) !important;
+                padding: 8px 15px !important;
+                font-size: 12px !important;
+                line-height: 1.6 !important;
                 top: 10px !important;
                 left: 10px !important;
-                border-radius: 8px;
+                border-radius: 10px;
+                border: 2px solid #FFD700 !important;
                 z-index: 1000 !important;
                 position: fixed !important;
+                color: #FFFFFF !important;
+                font-weight: bold !important;
             }
             
-            /* Game over screen below score */
+            /* Game over screen - maintain aspect ratio */
             .game-over-screen {
                 z-index: 500 !important;
+                width: auto !important;
+                max-width: 600px !important;
+                aspect-ratio: 4/3 !important;
+            }
+            
+            /* Start screen canvas - maintain proportions */
+            #startCanvas {
+                aspect-ratio: 4/3 !important;
             }
             
             /* Ergonomic button placement - lower and more inward */
@@ -1391,6 +1403,13 @@
             for (let building of startBuildings) {
                 drawBuilding(startCtx, building);
             }
+            
+            // Add mom with stroller on the sidewalk!
+            const momX = 80;
+            const momY = GROUND_Y - 50;
+            
+            // Draw the player with stroller (using same drawing function from game)
+            drawPlayer(startCtx, { x: momX, y: momY, isDucking: false, frame: 0 });
             
             // Tel Aviv logo in center top
             drawTelAvivLogo(startCtx, startCanvas.width / 2 - 80, 20, 160);
