@@ -1358,7 +1358,7 @@
             const segmentWidth = 50;
             const curbHeight = 20;
             for (let i = 0; i < startCanvas.width / segmentWidth + 1; i++) {
-                const sectionIndex = Math.floor(i / 2) % 2; // Every 2 segments switch color
+                const sectionIndex = Math.floor(i / 8) % 2; // Every 8 segments (4 pairs) switch color
                 let color;
                 if (i % 2 === 0) { // Colored segment
                     color = sectionIndex === 0 ? '#0066CC' : '#FF0000'; // Blue or Red
@@ -1669,7 +1669,7 @@
             
             for (let i = 0; i < canvas.width / segmentWidth + 2; i++) {
                 const x = (i * segmentWidth - (bgScroll * 0.8) % segmentWidth);
-                const sectionIndex = Math.floor(i / 2) % 2; // Every 2 segments switch color
+                const sectionIndex = Math.floor(i / 8) % 2; // Every 8 segments (4 pairs) switch color
                 let color;
                 if (i % 2 === 0) { // Colored segment
                     color = sectionIndex === 0 ? '#0066CC' : '#FF0000'; // Blue or Red
