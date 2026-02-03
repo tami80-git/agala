@@ -313,20 +313,20 @@
             
             /* Compact score overlay - ALWAYS ON TOP with better visibility */
             .ui-overlay {
-                background: rgba(0,0,0,0.85) !important;
-                padding: 5px 10px !important;
-                font-size: 10px !important;
-                line-height: 1.4 !important;
-                top: 5px !important;
-                left: 5px !important;
+                background: rgba(0,0,0,0.9) !important;
+                padding: 6px 12px !important;
+                font-size: 11px !important;
+                line-height: 1.5 !important;
+                top: 10px !important;
+                left: 10px !important;
                 border-radius: 8px;
                 border: 2px solid #FFD700 !important;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.6) !important;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.7) !important;
                 z-index: 1000 !important;
                 position: fixed !important;
                 color: #FFFFFF !important;
                 font-weight: bold !important;
-                max-width: 120px !important;
+                max-width: 140px !important;
             }
             
             /* Game over screen - maintain aspect ratio */
@@ -1721,26 +1721,16 @@
             drawRect(ctx, 10, 10, 200, 3, '#FFD700');
             drawRect(ctx, 10, 97, 200, 3, '#FFD700');
             
-            // Score text
-            ctx.fillStyle = '#FFD700';
-            ctx.font = 'bold 16px Arial';
-            ctx.textAlign = 'left';
-            ctx.fillText('ניקוד:', 20, 30);
-            ctx.fillStyle = '#FFF';
-            ctx.font = 'bold 20px Arial';
-            ctx.fillText(score.toString(), 20, 55);
+            // Score is displayed in UI overlay, not drawn on canvas
+            // Keeping only the combo display for special effects
             
-            // Distance
-            ctx.fillStyle = '#90EE90';
-            ctx.font = 'bold 12px Arial';
-            ctx.fillText(`מרחק: ${Math.floor(distance / 10)}מ׳`, 20, 75);
-            
-            // Combo display in panel if active
+            // Combo display if active
             if (player.comboCount >= 3) {
                 ctx.fillStyle = player.comboCount >= 15 ? '#FF69B4' : 
                                player.comboCount >= 10 ? '#00CED1' : '#FFD700';
                 ctx.font = 'bold 14px Arial';
-                ctx.fillText(`🔥 x${player.comboCount}`, 20, 92);
+                ctx.textAlign = 'left';
+                ctx.fillText(`🔥 x${player.comboCount}`, 20, 40);
             }
             
             // Big combo display in center if 5+
