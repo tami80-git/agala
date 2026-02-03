@@ -164,17 +164,8 @@
             <button class="pixel-button" onclick="restartGame()">לשחק שוב</button>
         </div>
         
-        <div class="controls-text">
-            רווח = קפיצה  |  חץ למטה = כריעה
-        </div>
-        
-        <div class="mobile-controls" id="mobileControls">
-            <div class="touch-button jump" id="jumpButton">
-                ⬆️<br>קפיצה
-            </div>
-            <div class="touch-button duck" id="duckButton">
-                ⬇️<br>כריעה
-            </div>
+        <div class="controls-text" style="font-size: 14px; font-weight: bold; padding: 15px 25px; margin-bottom: 20px;">
+            ⬆️ רווח = קפיצה  |  ⬇️ חץ למטה = כריעה
         </div>
     </div>
 
@@ -255,8 +246,10 @@
         const jumpButton = document.getElementById('jumpButton');
         const duckButton = document.getElementById('duckButton');
         
-        // Jump button
-        jumpButton.addEventListener('touchstart', (e) => {
+        // Only add event listeners if buttons exist
+        if (jumpButton && duckButton) {
+            // Jump button
+            jumpButton.addEventListener('touchstart', (e) => {
             e.preventDefault();
             if (gameRunning && !player.isJumping) {
                 player.velocityY = JUMP_FORCE;
@@ -301,6 +294,7 @@
         duckButton.addEventListener('mouseleave', (e) => {
             keys['ArrowDown'] = false;
         });
+        } // End of mobile controls check
         
         startCanvas.addEventListener('click', (e) => {
             if (gameState === 'start') {
@@ -384,12 +378,6 @@
             gameState = 'playing';
             gameRunning = true;
             document.getElementById('startScreen').classList.add('hidden');
-            
-            // Show mobile controls during gameplay
-            const mobileControls = document.getElementById('mobileControls');
-            if (mobileControls) {
-                mobileControls.classList.add('active');
-            }
             
             score = 0;
             distance = 0;
