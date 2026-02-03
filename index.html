@@ -280,8 +280,8 @@
                 height: 100vh !important;
                 width: 100vw !important;
                 display: flex !important;
-                align-items: stretch !important;
-                justify-content: stretch !important;
+                align-items: center !important;
+                justify-content: center !important;
                 overflow: hidden !important;
                 position: fixed;
                 top: 0;
@@ -290,16 +290,16 @@
             }
             
             canvas {
-                /* Fill the screen completely */
-                width: 100% !important;
-                height: 100% !important;
+                /* Maintain aspect ratio but fill as much as possible */
                 max-width: 100vw !important;
                 max-height: 100vh !important;
+                width: auto !important;
+                height: 100vh !important;
                 border: none !important;
                 display: block !important;
-                margin: 0 !important;
+                margin: 0 auto !important;
                 padding: 0 !important;
-                background: transparent !important;
+                background: #5C94FC !important;
             }
             
             /* Hide any overflow elements */
@@ -308,7 +308,6 @@
             }
             
             #startCanvas, #gameCanvas {
-                object-fit: fill !important;
                 image-rendering: auto !important;
             }
             
