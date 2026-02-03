@@ -302,7 +302,7 @@
                 left: 0;
             }
             
-            /* Compact score overlay */
+            /* Compact score overlay - ALWAYS ON TOP */
             .ui-overlay {
                 background: rgba(0,0,0,0.8) !important;
                 padding: 6px 12px !important;
@@ -310,22 +310,28 @@
                 top: 10px !important;
                 left: 10px !important;
                 border-radius: 8px;
-                z-index: 100;
+                z-index: 1000 !important;
+                position: fixed !important;
             }
             
-            /* Ergonomic button placement - in thumb zones */
+            /* Game over screen below score */
+            .game-over-screen {
+                z-index: 500 !important;
+            }
+            
+            /* Ergonomic button placement - lower and more inward */
             .mobile-controls {
                 position: fixed !important;
-                bottom: 25px !important;
+                bottom: 15px !important;
                 left: 0 !important;
                 right: 0 !important;
                 width: 100vw !important;
                 display: flex !important;
                 justify-content: space-between !important;
-                padding: 0 40px !important;
+                padding: 0 25px !important;
                 gap: 0 !important;
                 pointer-events: none;
-                z-index: 200;
+                z-index: 900;
             }
             
             .touch-button {
