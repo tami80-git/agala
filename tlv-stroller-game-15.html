@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>אתגר העגלה - הגרסה התל אביבית</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        
+        .game-container {
+            position: relative;
+        }
+        
+        #startCanvas {
+            max-width: 100%;
+            height: auto;
+        }
+            border: 8px solid #2c3e50;
+            box-shadow: 0 0 50px rgba(52, 152, 219, 0.5);
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 15px;
+            background: rgba(0,0,0,0.7);
+            color: #fff;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+        }
+        
+        .start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            pointer-events: all;
+        }
+        
+        .start-screen.hidden {
+            display: none;
+        }
+        
+        .game-over-screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95);
+            padding: 40px;
+            border: 4px solid #FFD700;
+            text-align: center;
+            display: none;
+            z-index: 100;
+            color: #fff;
+        }
+        
+        .game-over-screen.active {
+            display: block;
+        }
+        
+        .game-over-screen h2 {
+            color: #FF6B6B;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        
+        .game-over-screen p {
+            font-size: 12px;
+            margin-bottom: 30px;
+            line-height: 1.8;
+        }
+        
+        .pixel-button {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            padding: 15px 30px;
+            border: none;
+            cursor: pointer;
+            background: #FFD700;
+            color: #000;
+            box-shadow: 4px 4px 0 #000;
+            transition: all 0.1s;
+        }
+        
+        .pixel-button:hover {
+            background: #FFA500;
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0 #000;
+        }
+        
+        .controls-text {
+            position: absolute;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: #fff;
+            padding: 12px 30px;
+            font-size: 14px;
+            text-align: center;
+            line-height: 1.8;
+            border-radius: 8px;
+            border: 2px solid #FFD700;
+        }
+        
+        @media (max-width: 768px) {
+            .controls-text {
+                font-size: 12px;
+                padding: 12px 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="640" height="480"></canvas>
+        
+        <div class="ui-overlay">
+            <div>מרחק: <span id="distance">0</span>מ׳</div>
+            <div>ניקוד: <span id="score">0</span></div>
+            <div>שיא: <span id="highScore">0</span></div>
+        </div>
+        
+        <div class="start-screen" id="startScreen">
+            <canvas id="startCanvas" width="640" height="480"></canvas>
+        </div>
+        
+        <div class="game-over-screen" id="gameOverScreen">
+            <h2>GAME OVER</h2>
+            <p id="finalScore"></p>
+            <button class="pixel-button" onclick="restartGame()">לשחק שוב</button>
+        </div>
+        
+        <div class="controls-text">
+            רווח = קפיצה  |  חץ למטה = כריעה
+        </div>
+        
+        <div class="mobile-controls" id="mobileControls">
+            <div class="touch-button jump" id="jumpButton">
+                ⬆️<br>קפיצה
+            </div>
+            <div class="touch-button duck" id="duckButton">
+                ⬇️<br>כריעה
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startCanvas = document.getElementById('startCanvas');
+        const startCtx = startCanvas.getContext('2d');
+        
+        // Game state
+        let gameState = 'start';
+        let gameRunning = false;
+        let score = 0;
+        let distance = 0;
+        let highScore = localStorage.getItem('tlvStrollerHighScore') || 0;
+        document.getElementById('highScore').textContent = highScore;
+        
+        let frameCount = 0;
+        let gameSpeed = 6;
+        let bgScroll = 0;
+        
+        const GROUND_Y = 380;
+        const GRAVITY = 0.6;
+        const JUMP_FORCE = -14;
+        
+        // Player
+        const player = {
+            x: 100,
+            y: GROUND_Y - 50,
+            width: 40,
+            height: 50,
+            velocityY: 0,
+            isJumping: false,
+            isDucking: false,
+            normalHeight: 50,
+            duckHeight: 30,
+            comboCount: 0,  // Combo counter for bonus points
+            lastObstacleTime: 0
+        };
+        
+        // Obstacles
+        const obstacles = [];
+        const obstacleTypes = [
+            { name: 'trash_orange', color: '#FF8C00', width: 30, height: 40, canJump: true, points: 10 },
+            { name: 'trash_blue', color: '#2E5C8A', width: 30, height: 40, canJump: true, points: 10 },
+            { name: 'trash_green', color: '#4A7C4E', width: 30, height: 40, canJump: true, points: 10 },
+            { name: 'poop', color: '#8B4513', width: 24, height: 20, canJump: true, points: 15 },
+            { name: 'bike_lying', color: '#C41E3A', width: 45, height: 25, canJump: true, points: 18 },
+            { name: 'branches', color: '#8B4513', width: 50, height: 30, canJump: true, points: 16 },
+            { name: 'scooter', color: '#00CED1', width: 28, height: 40, canJump: true, points: 12 },
+            { name: 'bird', color: '#8B4500', width: 30, height: 20, canJump: false, points: 20, flying: true }
+        ];
+        
+        // Background elements
+        const clouds = [];
+        const buildings = [];
+        
+        // Input
+        const keys = {};
+        let startButtonBounce = 0;
+        
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            if (gameRunning && e.key === ' ' && !player.isJumping) {
+                player.velocityY = JUMP_FORCE;
+                player.isJumping = true;
+            }
+            if (gameState === 'start' && e.key === ' ') {
+                startGame();
+            }
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+        
+        // Mobile touch controls
+        const jumpButton = document.getElementById('jumpButton');
+        const duckButton = document.getElementById('duckButton');
+        
+        // Jump button
+        jumpButton.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameRunning && !player.isJumping) {
+                player.velocityY = JUMP_FORCE;
+                player.isJumping = true;
+            }
+        });
+        
+        // Duck button - hold to duck
+        duckButton.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            keys['ArrowDown'] = true;
+        });
+        
+        duckButton.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            keys['ArrowDown'] = false;
+        });
+        
+        // Prevent scrolling when touching buttons
+        jumpButton.addEventListener('touchmove', (e) => e.preventDefault());
+        duckButton.addEventListener('touchmove', (e) => e.preventDefault());
+        
+        // Also add click events for desktop testing
+        jumpButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (gameRunning && !player.isJumping) {
+                player.velocityY = JUMP_FORCE;
+                player.isJumping = true;
+            }
+        });
+        
+        duckButton.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            keys['ArrowDown'] = true;
+        });
+        
+        duckButton.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            keys['ArrowDown'] = false;
+        });
+        
+        duckButton.addEventListener('mouseleave', (e) => {
+            keys['ArrowDown'] = false;
+        });
+        
+        startCanvas.addEventListener('click', (e) => {
+            if (gameState === 'start') {
+                const rect = startCanvas.getBoundingClientRect();
+                const scaleX = startCanvas.width / rect.width;
+                const scaleY = startCanvas.height / rect.height;
+                const x = (e.clientX - rect.left) * scaleX;
+                const y = (e.clientY - rect.top) * scaleY;
+                
+                if (x > 220 && x < 420 && y > 280 && y < 340) {
+                    startGame();
+                }
+            }
+        });
+        
+        startCanvas.addEventListener('touchstart', (e) => {
+            if (gameState === 'start') {
+                e.preventDefault();
+                const rect = startCanvas.getBoundingClientRect();
+                const touch = e.touches[0];
+                const scaleX = startCanvas.width / rect.width;
+                const scaleY = startCanvas.height / rect.height;
+                const x = (touch.clientX - rect.left) * scaleX;
+                const y = (touch.clientY - rect.top) * scaleY;
+                
+                if (x > 220 && x < 420 && y > 280 && y < 340) {
+                    startGame();
+                }
+            }
+        });
+        
+        function initBackground() {
+            // Clouds
+            for (let i = 0; i < 5; i++) {
+                clouds.push({
+                    x: Math.random() * canvas.width,
+                    y: 50 + Math.random() * 100,
+                    width: 60,
+                    speed: 0.5 + Math.random() * 0.5
+                });
+            }
+            
+            // Tel Aviv Skyline - iconic buildings
+            buildings.push(
+                // Extra building on the left
+                { x: 50, y: 260, width: 35, height: 120, color: '#BDB76B', type: 'bauhaus', windowPattern: null },
+                
+                // Azrieli Center - 3 towers (round, triangular, square)
+                { x: 100, y: 180, width: 40, height: 200, color: '#708090', type: 'round', windowPattern: null },
+                { x: 145, y: 200, width: 35, height: 180, color: '#778899', type: 'triangle', windowPattern: null },
+                { x: 185, y: 190, width: 40, height: 190, color: '#696969', type: 'square', windowPattern: null },
+                
+                // Fill gap
+                { x: 230, y: 250, width: 30, height: 130, color: '#D2B48C', type: 'bauhaus', windowPattern: null },
+                
+                // Modern towers
+                { x: 265, y: 220, width: 35, height: 160, color: '#4682B4', type: 'modern', windowPattern: null },
+                { x: 305, y: 210, width: 30, height: 170, color: '#5F9EA0', type: 'modern', windowPattern: null },
+                
+                // Older buildings
+                { x: 340, y: 260, width: 40, height: 120, color: '#D2B48C', type: 'bauhaus', windowPattern: null },
+                { x: 385, y: 250, width: 35, height: 130, color: '#BDB76B', type: 'bauhaus', windowPattern: null },
+                
+                // Fill gap
+                { x: 425, y: 240, width: 30, height: 140, color: '#8B7355', type: 'modern', windowPattern: null },
+                
+                // More towers
+                { x: 460, y: 200, width: 38, height: 180, color: '#708090', type: 'modern', windowPattern: null },
+                { x: 503, y: 230, width: 32, height: 150, color: '#778899', type: 'modern', windowPattern: null },
+                
+                // Sarona/newer area
+                { x: 540, y: 240, width: 40, height: 140, color: '#8B7355', type: 'modern', windowPattern: null },
+                { x: 585, y: 220, width: 35, height: 160, color: '#A0826D', type: 'modern', windowPattern: null },
+                
+                // Extra on the right
+                { x: 625, y: 250, width: 32, height: 130, color: '#4682B4', type: 'modern', windowPattern: null }
+            );
+        }
+        
+        function startGame() {
+            gameState = 'playing';
+            gameRunning = true;
+            document.getElementById('startScreen').classList.add('hidden');
+            
+            // Show mobile controls during gameplay
+            const mobileControls = document.getElementById('mobileControls');
+            if (mobileControls) {
+                mobileControls.classList.add('active');
+            }
+            
+            score = 0;
+            distance = 0;
+            gameSpeed = 6;
+            frameCount = 0;
+            obstacles.length = 0;
+            player.y = GROUND_Y - player.normalHeight;
+            player.velocityY = 0;
+            player.isJumping = false;
+            player.isDucking = false;
+            player.height = player.normalHeight;
+        }
+        
+        // Draw functions
+        function drawRect(ctx, x, y, w, h, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(Math.floor(x), Math.floor(y), Math.floor(w), Math.floor(h));
+        }
+        
+        function drawTelAvivLogo(ctx, x, y, size) {
+            const scale = size / 100;
+            const centerX = x + 70 * scale;
+            const centerY = y + 50 * scale;
+            
+            // Draw the colorful mosaic circle - fixed pattern, not random
+            const colors = [
+                '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', 
+                '#FF7675', '#74B9FF', '#A29BFE', '#FD79A8', '#FDCB6E',
+                '#00B894', '#00CEC9', '#0984E3', '#6C5CE7', '#E17055',
+                '#55EFC4', '#81ECEC', '#FAB1A0', '#FF9FF3', '#FDCB6E'
+            ];
+            
+            const pieces = [
+                // Ring 1 (outer)
+                {angle: 0, radius: 35, width: 12, height: 6, color: 0},
+                {angle: 25, radius: 36, width: 10, height: 8, color: 1},
+                {angle: 50, radius: 34, width: 14, height: 7, color: 2},
+                {angle: 75, radius: 37, width: 9, height: 6, color: 3},
+                {angle: 100, radius: 35, width: 11, height: 9, color: 4},
+                {angle: 125, radius: 36, width: 13, height: 7, color: 5},
+                {angle: 150, radius: 34, width: 10, height: 8, color: 6},
+                {angle: 175, radius: 37, width: 12, height: 6, color: 7},
+                {angle: 200, radius: 35, width: 11, height: 7, color: 8},
+                {angle: 225, radius: 36, width: 14, height: 8, color: 9},
+                {angle: 250, radius: 34, width: 10, height: 6, color: 10},
+                {angle: 275, radius: 37, width: 12, height: 9, color: 11},
+                {angle: 300, radius: 35, width: 13, height: 7, color: 12},
+                {angle: 325, radius: 36, width: 11, height: 8, color: 13},
+                // Ring 2 (middle)
+                {angle: 15, radius: 24, width: 10, height: 7, color: 14},
+                {angle: 45, radius: 26, width: 12, height: 6, color: 15},
+                {angle: 75, radius: 25, width: 9, height: 8, color: 16},
+                {angle: 105, radius: 24, width: 11, height: 7, color: 17},
+                {angle: 135, radius: 26, width: 10, height: 6, color: 18},
+                {angle: 165, radius: 25, width: 13, height: 8, color: 19},
+                {angle: 195, radius: 24, width: 11, height: 7, color: 0},
+                {angle: 225, radius: 26, width: 10, height: 9, color: 1},
+                {angle: 255, radius: 25, width: 12, height: 6, color: 2},
+                {angle: 285, radius: 24, width: 9, height: 8, color: 3},
+                {angle: 315, radius: 26, width: 11, height: 7, color: 4},
+                {angle: 345, radius: 25, width: 10, height: 6, color: 5}
+            ];
+            
+            for (let piece of pieces) {
+                const angle = piece.angle * Math.PI / 180;
+                const px = centerX + Math.cos(angle) * piece.radius * scale;
+                const py = centerY + Math.sin(angle) * piece.radius * scale;
+                
+                ctx.save();
+                ctx.translate(px, py);
+                ctx.rotate(angle);
+                drawRect(ctx, -piece.width * scale / 2, -piece.height * scale / 2, 
+                        piece.width * scale, piece.height * scale, colors[piece.color]);
+                ctx.restore();
+            }
+            
+            // Shield emblem on the left
+            const shieldX = x + 10 * scale;
+            const shieldY = y + 35 * scale;
+            
+            ctx.fillStyle = '#0099FF';
+            ctx.beginPath();
+            ctx.moveTo(shieldX + 10 * scale, shieldY);
+            ctx.lineTo(shieldX + 18 * scale, shieldY + 3 * scale);
+            ctx.lineTo(shieldX + 18 * scale, shieldY + 12 * scale);
+            ctx.lineTo(shieldX + 10 * scale, shieldY + 18 * scale);
+            ctx.lineTo(shieldX + 2 * scale, shieldY + 12 * scale);
+            ctx.lineTo(shieldX + 2 * scale, shieldY + 3 * scale);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Inner shield detail
+            ctx.fillStyle = '#FFF';
+            drawRect(ctx, shieldX + 7 * scale, shieldY + 6 * scale, 6 * scale, 2 * scale, '#FFF');
+            drawRect(ctx, shieldX + 7 * scale, shieldY + 8 * scale, 2 * scale, 5 * scale, '#FFF');
+            drawRect(ctx, shieldX + 11 * scale, shieldY + 8 * scale, 2 * scale, 5 * scale, '#FFF');
+            
+            // Pixelated text - TEL (תל) AVIV (אביב) YAFO (יפו)
+            ctx.fillStyle = '#FFF';
+            ctx.font = `bold ${10 * scale}px "Press Start 2P"`;
+            ctx.textAlign = 'left';
+            ctx.fillText('TEL', x + 30 * scale, y + 35 * scale);
+            ctx.fillText('AVIV', x + 25 * scale, y + 50 * scale);
+            ctx.fillText('YAFO', x + 28 * scale, y + 65 * scale);
+        }
+        
+        function drawCloud(ctx, cloud) {
+            drawRect(ctx, cloud.x + 8, cloud.y, 40, 16, '#FFF');
+            drawRect(ctx, cloud.x + 4, cloud.y + 4, 48, 12, '#FFF');
+            drawRect(ctx, cloud.x, cloud.y + 8, 56, 8, '#FFF');
+            drawRect(ctx, cloud.x + 8, cloud.y + 12, 40, 6, '#E8E8E8');
+        }
+        
+        function drawBuilding(ctx, building) {
+            const x = building.x;
+            const y = building.y;
+            const w = building.width;
+            const h = building.height;
+            
+            // Initialize window pattern if not exists
+            if (!building.windowPattern) {
+                building.windowPattern = [];
+                const maxRows = Math.ceil(h / 10);
+                const maxCols = Math.ceil(w / 7);
+                for (let r = 0; r < maxRows; r++) {
+                    building.windowPattern[r] = [];
+                    for (let c = 0; c < maxCols; c++) {
+                        building.windowPattern[r][c] = Math.random();
+                    }
+                }
+            }
+            
+            if (building.type === 'round') {
+                // Improved Round Azrieli tower - more cylindrical
+                // Draw cylinder shape with curves
+                drawRect(ctx, x + w/4, y, w/2, h, building.color); // Center column
+                drawRect(ctx, x + w/6, y + 8, w * 2/3, h - 16, building.color); // Wider middle
+                drawRect(ctx, x + w/8, y + 20, w * 3/4, h - 40, building.color); // Widest part
+                
+                // Curved edges for cylindrical effect
+                drawRect(ctx, x + 3, y + 30, 3, h - 60, building.color);
+                drawRect(ctx, x + w - 6, y + 30, 3, h - 60, building.color);
+                
+                // Windows in curved pattern - STATIC
+                const rows = Math.floor(h / 12);
+                for (let row = 0; row < rows; row++) {
+                    for (let col = 0; col < 5; col++) {
+                        if (building.windowPattern[row] && building.windowPattern[row][col] > 0.3) {
+                            drawRect(ctx, x + 6 + col * 6, y + 25 + row * 12, 4, 8, '#FFFF99');
+                        }
+                    }
+                }
+                
+                // Top dome/crown
+                drawRect(ctx, x + w/4, y - 4, w/2, 4, '#B0B0B0');
+                drawRect(ctx, x + w/3, y - 6, w/3, 2, '#B0B0B0');
+                
+                // Antenna
+                drawRect(ctx, x + w/2 - 1, y - 20, 2, 14, '#C0C0C0');
+                drawRect(ctx, x + w/2 - 2, y - 22, 4, 3, '#FF0000');
+                
+            } else if (building.type === 'triangle') {
+                // Improved Triangular Azrieli tower - sharper pyramid
+                const layers = Math.floor(h / 8);
+                for (let i = 0; i < layers; i++) {
+                    const layerY = y + i * 8;
+                    const progress = i / layers;
+                    const layerWidth = w * (1 - progress * 0.7); // Narrows to 30% at top
+                    const xOffset = (w - layerWidth) / 2;
+                    
+                    drawRect(ctx, x + xOffset, layerY, layerWidth, 8, building.color);
+                }
+                
+                // Windows - STATIC, following pyramid shape
+                const rows = Math.floor(h / 15);
+                for (let row = 0; row < rows; row++) {
+                    const progress = row / rows;
+                    const rowWidth = Math.floor(w * (1 - progress * 0.7));
+                    const xOffset = (w - rowWidth) / 2;
+                    const cols = Math.floor(rowWidth / 8);
+                    
+                    for (let col = 0; col < cols; col++) {
+                        if (building.windowPattern[row] && building.windowPattern[row][col] > 0.3) {
+                            drawRect(ctx, x + xOffset + col * 8 + 1, y + row * 15 + 2, 6, 10, '#FFFFAA');
+                        }
+                    }
+                }
+                
+                // Top point
+                drawRect(ctx, x + w/2 - 3, y - 5, 6, 5, '#A0A0A0');
+                
+            } else if (building.type === 'square') {
+                // Square Azrieli tower
+                drawRect(ctx, x, y, w, h, building.color);
+                
+                // Windows in grid - STATIC
+                const rows = Math.floor(h / 12);
+                const cols = Math.floor(w / 8);
+                for (let row = 0; row < rows; row++) {
+                    for (let col = 0; col < cols; col++) {
+                        if (building.windowPattern[row] && building.windowPattern[row][col] > 0.25) {
+                            drawRect(ctx, x + 2 + col * 8, y + 2 + row * 12, 6, 9, '#FFFF88');
+                        }
+                    }
+                }
+                
+            } else if (building.type === 'modern') {
+                // Modern glass towers
+                drawRect(ctx, x, y, w, h, building.color);
+                drawRect(ctx, x + 2, y, w - 4, 4, '#B0C4DE');
+                
+                // Glass windows - STATIC
+                const rows = Math.floor(h / 10);
+                const cols = Math.floor(w / 7);
+                for (let row = 0; row < rows; row++) {
+                    for (let col = 0; col < cols; col++) {
+                        const windowColor = (building.windowPattern[row] && building.windowPattern[row][col] > 0.4) ? '#87CEEB' : '#4682B4';
+                        drawRect(ctx, x + 1 + col * 7, y + 3 + row * 10, 6, 8, windowColor);
+                    }
+                }
+                
+            } else if (building.type === 'bauhaus') {
+                // White Bauhaus buildings
+                drawRect(ctx, x, y, w, h, building.color);
+                
+                // Small square windows - STATIC
+                const rows = Math.floor(h / 14);
+                const cols = Math.floor(w / 9);
+                for (let row = 0; row < rows; row++) {
+                    for (let col = 0; col < cols; col++) {
+                        if (building.windowPattern[row] && building.windowPattern[row][col] > 0.2) {
+                            drawRect(ctx, x + 3 + col * 9, y + 3 + row * 14, 6, 10, '#8B7355');
+                        }
+                    }
+                }
+                
+                // Balconies
+                for (let row = 1; row < rows; row += 2) {
+                    drawRect(ctx, x - 2, y + row * 14, w + 4, 2, '#A9A9A9');
+                }
+            }
+            
+            // Roof
+            drawRect(ctx, x - 2, y - 3, w + 4, 3, '#2F4F4F');
+        }
+        
+        function drawPlayer(ctx) {
+            const x = player.x;
+            const y = player.y;
+            const runFrame = Math.floor(frameCount / 6) % 2;
+            
+            // Shadow - bigger for stroller
+            drawRect(ctx, x + 2, GROUND_Y - 2, 50, 4, 'rgba(0,0,0,0.3)');
+            
+            if (player.isDucking) {
+                // Ducking pose - horizontal
+                drawRect(ctx, x, y + 20, 40, 20, '#FF1493'); // Body
+                drawRect(ctx, x, y + 15, 15, 15, '#FFD4A0'); // Head
+                drawRect(ctx, x + 1, y + 15, 12, 6, '#4B3621'); // Hair
+                
+                // Stroller in front - lower and simplified when ducking
+                drawRect(ctx, x + 32, y + 30, 20, 10, '#34495E');
+                drawRect(ctx, x + 48, y + 37, 6, 6, '#000'); // Wheel
+                drawRect(ctx, x + 34, y + 37, 6, 6, '#000'); // Wheel
+            } else {
+                // MODERN DETAILED STROLLER - like reference image
+                
+                // 4 WHEELS - front and back, realistic
+                // Back wheels (larger, more visible)
+                drawRect(ctx, x + 26, y + 40, 8, 8, '#1a1a1a');
+                drawRect(ctx, x + 27, y + 41, 6, 6, '#2C3E50');
+                drawRect(ctx, x + 29, y + 43, 2, 2, '#7F8C8D');
+                
+                drawRect(ctx, x + 38, y + 40, 8, 8, '#1a1a1a');
+                drawRect(ctx, x + 39, y + 41, 6, 6, '#2C3E50');
+                drawRect(ctx, x + 41, y + 43, 2, 2, '#7F8C8D');
+                
+                // Front wheels (slightly smaller, forward)
+                drawRect(ctx, x + 48, y + 41, 7, 7, '#1a1a1a');
+                drawRect(ctx, x + 49, y + 42, 5, 5, '#34495E');
+                drawRect(ctx, x + 51, y + 44, 1, 1, '#95A5A6');
+                
+                // Frame/chassis - silver/gray structure
+                drawRect(ctx, x + 28, y + 38, 24, 3, '#7F8C8D');
+                drawRect(ctx, x + 30, y + 35, 2, 5, '#7F8C8D'); // Support bars
+                drawRect(ctx, x + 44, y + 35, 2, 5, '#7F8C8D');
+                
+                // Lower basket/storage - dark blue
+                drawRect(ctx, x + 28, y + 32, 20, 8, '#2C3E50');
+                drawRect(ctx, x + 29, y + 33, 18, 2, '#34495E'); // Highlight
+                
+                // Main seat unit - navy blue with depth
+                drawRect(ctx, x + 30, y + 22, 20, 12, '#34495E');
+                drawRect(ctx, x + 31, y + 23, 18, 2, '#5D6D7E'); // Seat cushion highlight
+                
+                // Seat padding detail
+                drawRect(ctx, x + 32, y + 25, 16, 8, '#5D6D7E');
+                drawRect(ctx, x + 33, y + 26, 14, 6, '#7F8C8D'); // Inner padding
+                
+                // LARGE CANOPY/HOOD - major feature like in image
+                // Canopy back panel
+                drawRect(ctx, x + 28, y + 12, 22, 4, '#2C3E50');
+                
+                // Canopy curved top
+                drawRect(ctx, x + 28, y + 8, 22, 6, '#34495E');
+                drawRect(ctx, x + 29, y + 9, 20, 4, '#5D6D7E'); // Canopy fabric texture
+                
+                // Canopy front edge
+                drawRect(ctx, x + 28, y + 16, 22, 2, '#2C3E50');
+                
+                // Canopy window/mesh detail
+                drawRect(ctx, x + 35, y + 10, 8, 3, '#95A5A6');
+                
+                // Handle bars - brown leather-like grips
+                drawRect(ctx, x + 24, y + 18, 4, 16, '#7F8C8D'); // Left handle bar
+                drawRect(ctx, x + 22, y + 18, 4, 6, '#8B4513'); // Left grip
+                
+                drawRect(ctx, x + 50, y + 18, 4, 16, '#7F8C8D'); // Right handle bar  
+                drawRect(ctx, x + 50, y + 18, 4, 6, '#8B4513'); // Right grip
+                
+                // Baby visible in stroller - cute face peeking out
+                drawRect(ctx, x + 38, y + 24, 10, 8, '#FFD4A0'); // Baby head
+                drawRect(ctx, x + 39, y + 23, 8, 3, '#4B3621'); // Baby hair
+                drawRect(ctx, x + 40, y + 26, 2, 2, '#000'); // Left eye
+                drawRect(ctx, x + 44, y + 26, 2, 2, '#000'); // Right eye
+                drawRect(ctx, x + 42, y + 29, 2, 1, '#FFB6C1'); // Smile
+                
+                // Blanket visible
+                drawRect(ctx, x + 36, y + 30, 12, 4, '#87CEEB'); // Light blue blanket
+                
+                // Stroller details - cup holder
+                drawRect(ctx, x + 26, y + 28, 3, 4, '#2C3E50');
+                
+                // Mom legs (running animation)
+                if (runFrame === 0) {
+                    drawRect(ctx, x + 2, y + 25, 6, 18, '#0033AA');
+                    drawRect(ctx, x + 8, y + 20, 6, 18, '#0033AA');
+                    drawRect(ctx, x, y + 43, 6, 5, '#000');
+                } else {
+                    drawRect(ctx, x + 2, y + 20, 6, 18, '#0033AA');
+                    drawRect(ctx, x + 8, y + 25, 6, 18, '#0033AA');
+                    drawRect(ctx, x + 8, y + 43, 6, 5, '#000');
+                }
+                
+                // Mom body
+                drawRect(ctx, x, y + 8, 18, 20, '#FF1493');
+                drawRect(ctx, x + 1, y + 9, 16, 2, '#FF69B4');
+                
+                // Arms pushing stroller - both hands on handle
+                drawRect(ctx, x + 14, y + 16, 12, 6, '#FFD4A0'); // Right arm
+                drawRect(ctx, x + 14, y + 20, 12, 6, '#FFD4A0'); // Left arm
+                
+                // Head
+                drawRect(ctx, x + 2, y - 2, 12, 12, '#FFD4A0');
+                drawRect(ctx, x + 3, y - 1, 10, 10, '#FFDAB0');
+                
+                // Hair - ponytail
+                drawRect(ctx, x + 2, y - 2, 12, 5, '#4B3621');
+                drawRect(ctx, x, y, 4, 7, '#4B3621');
+                drawRect(ctx, x - 2, y + 4, 4, 6, '#4B3621'); // Ponytail
+                
+                // Face
+                drawRect(ctx, x + 4, y + 2, 2, 2, '#000'); // Eyes
+                drawRect(ctx, x + 9, y + 2, 2, 2, '#000');
+                drawRect(ctx, x + 5, y + 6, 4, 1, '#000'); // Smile
+            }
+        }
+        
+        function drawObstacle(ctx, obstacle) {
+            const type = obstacle.type;
+            const x = obstacle.x;
+            const y = obstacle.y;
+            
+            // Shadow
+            if (!type.flying) {
+                drawRect(ctx, x + 2, GROUND_Y - 2, type.width - 4, 3, 'rgba(0,0,0,0.3)');
+            }
+            
+            switch(type.name) {
+                case 'trash_orange':
+                case 'trash_blue':
+                case 'trash_green':
+                    // Determine colors based on bin type
+                    let binColor, binDark, binText;
+                    if (type.name === 'trash_orange') {
+                        binColor = '#FF8C00';
+                        binDark = '#CC6600';
+                        binText = 'כתום';
+                    } else if (type.name === 'trash_blue') {
+                        binColor = '#2E5C8A';
+                        binDark = '#1a3a5c';
+                        binText = 'כחול';
+                    } else {
+                        binColor = '#4A7C4E';
+                        binDark = '#2d5a30';
+                        binText = 'ירוק';
+                    }
+                    
+                    // Main bin body
+                    drawRect(ctx, x + 2, y + 12, type.width - 4, type.height - 14, binColor);
+                    
+                    // Top rim
+                    drawRect(ctx, x, y + 8, type.width, 5, binDark);
+                    
+                    // Lid
+                    drawRect(ctx, x + type.width/2 - 4, y + 6, 8, 3, '#333');
+                    
+                    // Tel Aviv shield logo on bin
+                    const logoX = x + type.width/2 - 5;
+                    const logoY = y + 18;
+                    
+                    // Small white shield
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath();
+                    ctx.moveTo(logoX + 5, logoY);
+                    ctx.lineTo(logoX + 9, logoY + 2);
+                    ctx.lineTo(logoX + 9, logoY + 8);
+                    ctx.lineTo(logoX + 5, logoY + 12);
+                    ctx.lineTo(logoX + 1, logoY + 8);
+                    ctx.lineTo(logoX + 1, logoY + 2);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // Text on bin
+                    ctx.fillStyle = '#FFF';
+                    ctx.font = '6px "Press Start 2P"';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('TEL', x + type.width/2, y + 35);
+                    ctx.fillText('AVIV', x + type.width/2, y + 42);
+                    
+                    // Bottom darker section
+                    drawRect(ctx, x + 2, y + type.height - 4, type.width - 4, 4, binDark);
+                    
+                    // Highlight
+                    drawRect(ctx, x + 4, y + 14, 3, 8, 'rgba(255,255,255,0.3)');
+                    break;
+                    
+                case 'poop':
+                    // Dog poop - BIG, detailed pile with FLIES
+                    const poopBrown = '#8B4513';
+                    const poopDark = '#654321';
+                    const poopLight = '#A0826D';
+                    
+                    // Make it BIGGER and more pile-like
+                    // Bottom layer - widest
+                    drawRect(ctx, x, y + 14, 24, 6, poopDark);
+                    drawRect(ctx, x + 2, y + 15, 20, 4, poopBrown);
+                    
+                    // Middle layers - stacked texture
+                    drawRect(ctx, x + 2, y + 10, 20, 6, poopBrown);
+                    drawRect(ctx, x + 4, y + 11, 16, 4, poopLight);
+                    
+                    // Upper layers
+                    drawRect(ctx, x + 4, y + 6, 16, 6, poopDark);
+                    drawRect(ctx, x + 6, y + 7, 12, 4, poopBrown);
+                    
+                    // Top peak
+                    drawRect(ctx, x + 8, y + 2, 8, 6, poopBrown);
+                    drawRect(ctx, x + 10, y + 3, 4, 4, poopLight);
+                    
+                    // Texture details - highlights
+                    drawRect(ctx, x + 4, y + 12, 3, 2, poopLight);
+                    drawRect(ctx, x + 17, y + 13, 2, 2, poopLight);
+                    drawRect(ctx, x + 10, y + 8, 2, 2, poopLight);
+                    
+                    // Dark shadows for depth
+                    drawRect(ctx, x + 1, y + 16, 2, 2, poopDark);
+                    drawRect(ctx, x + 20, y + 17, 2, 2, poopDark);
+                    
+                    // Stink lines - more visible and wavy
+                    const stinkColor = '#A0826D';
+                    // Left stink line
+                    drawRect(ctx, x + 4, y - 4, 2, 4, stinkColor);
+                    drawRect(ctx, x + 3, y - 6, 2, 2, stinkColor);
+                    
+                    // Middle stink line
+                    drawRect(ctx, x + 11, y - 6, 2, 6, stinkColor);
+                    drawRect(ctx, x + 10, y - 8, 2, 2, stinkColor);
+                    
+                    // Right stink line
+                    drawRect(ctx, x + 18, y - 4, 2, 4, stinkColor);
+                    drawRect(ctx, x + 19, y - 6, 2, 2, stinkColor);
+                    
+                    // FLIES buzzing around - MORE flies, more animated
+                    const flyFrame = Math.floor(frameCount / 3) % 4;
+                    const flies = [
+                        {x: 6, y: -2, offset: 0},
+                        {x: 14, y: 0, offset: 1},
+                        {x: 3, y: 4, offset: 2},
+                        {x: 19, y: 3, offset: 3},
+                        {x: 10, y: -4, offset: 4},
+                        {x: 16, y: 6, offset: 5}
+                    ];
+                    
+                    for (let fly of flies) {
+                        const flyX = x + fly.x + Math.sin((frameCount + fly.offset * 10) * 0.15) * 3;
+                        const flyY = y + fly.y + Math.cos((frameCount + fly.offset * 10) * 0.2) * 2;
+                        
+                        // Fly body - black
+                        drawRect(ctx, flyX, flyY, 2, 3, '#000');
+                        drawRect(ctx, flyX, flyY + 2, 2, 1, '#1a1a1a'); // Abdomen
+                        
+                        // Wings (flapping animation)
+                        if ((flyFrame + fly.offset) % 2 === 0) {
+                            // Wings up
+                            drawRect(ctx, flyX - 2, flyY, 2, 1, 'rgba(200,200,200,0.7)');
+                            drawRect(ctx, flyX + 2, flyY, 2, 1, 'rgba(200,200,200,0.7)');
+                        } else {
+                            // Wings down
+                            drawRect(ctx, flyX - 2, flyY + 1, 2, 1, 'rgba(200,200,200,0.7)');
+                            drawRect(ctx, flyX + 2, flyY + 1, 2, 1, 'rgba(200,200,200,0.7)');
+                        }
+                        
+                        // Tiny white eye reflection
+                        drawRect(ctx, flyX + 1, flyY, 1, 1, '#FFF');
+                    }
+                    break;
+                    
+                case 'scooter':
+                    // Detailed electric scooter like in reference
+                    const scooterBlack = '#2a2a2a';
+                    const scooterGray = '#555';
+                    const scooterDeck = '#3a3a3a';
+                    const handleBrownScooter = '#A0826D';
+                    
+                    // Deck (textured platform)
+                    drawRect(ctx, x + 4, y + 22, 20, 6, scooterDeck);
+                    // Deck texture
+                    for (let i = 0; i < 5; i++) {
+                        drawRect(ctx, x + 6 + i * 3, y + 23, 1, 4, '#4a4a4a');
+                    }
+                    
+                    // Rear wheel with fender
+                    drawRect(ctx, x + 18, y + 30, 8, 8, '#1a1a1a');
+                    drawRect(ctx, x + 19, y + 31, 6, 6, scooterGray);
+                    // Fender
+                    drawRect(ctx, x + 16, y + 28, 12, 3, scooterBlack);
+                    
+                    // Front wheel
+                    drawRect(ctx, x + 4, y + 30, 8, 8, '#1a1a1a');
+                    drawRect(ctx, x + 5, y + 31, 6, 6, scooterGray);
+                    
+                    // Stem (pole)
+                    drawRect(ctx, x + 10, y + 2, 3, 24, scooterBlack);
+                    drawRect(ctx, x + 11, y + 3, 1, 22, scooterGray); // highlight
+                    
+                    // Handlebars with grips
+                    drawRect(ctx, x + 5, y + 1, 14, 3, scooterBlack);
+                    drawRect(ctx, x + 5, y + 1, 3, 3, handleBrownScooter); // left grip
+                    drawRect(ctx, x + 16, y + 1, 3, 3, handleBrownScooter); // right grip
+                    
+                    // Brake lever
+                    drawRect(ctx, x + 7, y + 2, 2, 3, '#FF0000');
+                    
+                    // Front light
+                    drawRect(ctx, x + 10, y + 6, 3, 2, '#CCC');
+                    drawRect(ctx, x + 11, y + 7, 1, 1, '#FFF');
+                    
+                    // Display panel
+                    drawRect(ctx, x + 10, y + 10, 3, 4, '#1a1a1a');
+                    drawRect(ctx, x + 11, y + 11, 1, 1, '#0F0'); // LED
+                    
+                    // Folding mechanism
+                    drawRect(ctx, x + 10, y + 20, 4, 2, '#666');
+                    
+                    // Kickstand
+                    drawRect(ctx, x + 14, y + 28, 2, 6, scooterGray);
+                    
+                    // Rear reflector
+                    drawRect(ctx, x + 22, y + 29, 2, 2, '#FF6B6B');
+                    break;
+                    
+                case 'bird':
+                    // Flying bird
+                    const wingFrame = Math.floor(frameCount / 4) % 2;
+                    
+                    // Body
+                    drawRect(ctx, x + 10, y + 8, 12, 8, type.color);
+                    
+                    // Head
+                    drawRect(ctx, x + 20, y + 6, 8, 8, type.color);
+                    drawRect(ctx, x + 26, y + 8, 4, 3, '#FFD700');
+                    
+                    // Wings
+                    if (wingFrame === 0) {
+                        drawRect(ctx, x, y + 10, 12, 4, type.color);
+                        drawRect(ctx, x + 20, y + 10, 12, 4, type.color);
+                    } else {
+                        drawRect(ctx, x + 2, y + 4, 12, 4, type.color);
+                        drawRect(ctx, x + 18, y + 4, 12, 4, type.color);
+                    }
+                    
+                    // Eye
+                    drawRect(ctx, x + 23, y + 8, 2, 2, '#000');
+                    break;
+                    
+                case 'bike_lying':
+                    // Simpler, clearer bicycle design
+                    const bikeRed = '#E74C3C';
+                    const bikeBlack = '#1a1a1a';
+                    const bikeSilver = '#95A5A6';
+                    const bikeSeat = '#8B4513';
+                    
+                    // Back wheel - big and clear
+                    drawRect(ctx, x + 4, y + 16, 18, 18, bikeBlack);
+                    drawRect(ctx, x + 6, y + 18, 14, 14, '#555');
+                    drawRect(ctx, x + 8, y + 20, 10, 10, '#888');
+                    // Center hub
+                    drawRect(ctx, x + 12, y + 24, 2, 2, bikeBlack);
+                    
+                    // Front wheel - big and clear
+                    drawRect(ctx, x + 28, y + 16, 18, 18, bikeBlack);
+                    drawRect(ctx, x + 30, y + 18, 14, 14, '#555');
+                    drawRect(ctx, x + 32, y + 20, 10, 10, '#888');
+                    // Center hub
+                    drawRect(ctx, x + 36, y + 24, 2, 2, bikeBlack);
+                    
+                    // Main frame - RED and obvious
+                    // Top tube
+                    drawRect(ctx, x + 14, y + 8, 24, 4, bikeRed);
+                    // Seat tube
+                    drawRect(ctx, x + 14, y + 8, 4, 12, bikeRed);
+                    // Down tube
+                    drawRect(ctx, x + 14, y + 16, 20, 4, bikeRed);
+                    // Head tube
+                    drawRect(ctx, x + 34, y + 8, 4, 12, bikeRed);
+                    
+                    // Seat post and seat
+                    drawRect(ctx, x + 14, y + 2, 3, 8, bikeSilver);
+                    drawRect(ctx, x + 12, y + 1, 8, 3, bikeSeat);
+                    
+                    // Handlebars - gray
+                    drawRect(ctx, x + 32, y + 6, 10, 3, bikeSilver);
+                    drawRect(ctx, x + 36, y + 4, 2, 4, bikeSilver);
+                    
+                    // Pedal
+                    drawRect(ctx, x + 20, y + 20, 8, 3, bikeBlack);
+                    
+                    // Chain guard
+                    drawRect(ctx, x + 16, y + 18, 12, 2, bikeRed);
+                    
+                    // Bell or light
+                    drawRect(ctx, x + 34, y + 8, 3, 3, '#FFD700');
+                    
+                    // Reflector on back wheel
+                    drawRect(ctx, x + 8, y + 24, 3, 2, '#FF0000');
+                    break;
+                    
+                case 'branches':
+                    // THICK pile of cut tree branches
+                    const branchBrown = '#8B4513';
+                    const branchLight = '#A0826D';
+                    const branchDark = '#654321';
+                    const leafGreen = '#228B22';
+                    const leafDark = '#1a5c1a';
+                    const leafLight = '#32CD32';
+                    
+                    // Make it MUCH thicker - more layers
+                    // Bottom layer
+                    for (let i = 0; i < 8; i++) {
+                        const bx = x + i * 6;
+                        const by = y + 20 + (i % 3) * 2;
+                        drawRect(ctx, bx, by, 10, 4, branchBrown);
+                        drawRect(ctx, bx + 1, by + 1, 2, 2, branchLight);
+                    }
+                    
+                    // Second layer
+                    for (let i = 0; i < 7; i++) {
+                        const bx = x + 3 + i * 7;
+                        const by = y + 16 + (i % 2) * 2;
+                        drawRect(ctx, bx, by, 12, 5, branchDark);
+                    }
+                    
+                    // Third layer
+                    for (let i = 0; i < 6; i++) {
+                        const bx = x + 5 + i * 8;
+                        const by = y + 12 + i % 3;
+                        drawRect(ctx, bx, by, 14, 4, branchBrown);
+                        // Twigs
+                        drawRect(ctx, bx + 4, by - 4, 2, 6, branchBrown);
+                    }
+                    
+                    // Top layer
+                    drawRect(ctx, x + 8, y + 8, 35, 5, branchBrown);
+                    drawRect(ctx, x + 12, y + 6, 28, 4, branchDark);
+                    
+                    // MANY MORE leaves throughout the pile
+                    const leafPos = [
+                        {x: 6, y: 5}, {x: 10, y: 6}, {x: 14, y: 7}, {x: 18, y: 5}, {x: 22, y: 6},
+                        {x: 26, y: 7}, {x: 30, y: 6}, {x: 34, y: 8}, {x: 38, y: 7}, {x: 42, y: 9},
+                        {x: 8, y: 10}, {x: 12, y: 11}, {x: 16, y: 12}, {x: 20, y: 10}, {x: 24, y: 11},
+                        {x: 28, y: 12}, {x: 32, y: 11}, {x: 36, y: 13}, {x: 40, y: 12}, {x: 44, y: 14},
+                        {x: 10, y: 15}, {x: 15, y: 16}, {x: 20, y: 17}, {x: 25, y: 16}, {x: 30, y: 17},
+                        {x: 35, y: 18}, {x: 40, y: 17}, {x: 7, y: 19}, {x: 18, y: 20}, {x: 28, y: 19},
+                        {x: 38, y: 21}, {x: 45, y: 20}, {x: 12, y: 22}, {x: 22, y: 23}, {x: 32, y: 22}
+                    ];
+                    
+                    for (let leaf of leafPos) {
+                        const leafColor = leaf.x % 3 === 0 ? leafGreen : 
+                                        leaf.x % 3 === 1 ? leafDark : leafLight;
+                        drawRect(ctx, x + leaf.x, y + leaf.y, 4, 3, leafColor);
+                    }
+                    
+                    // Scattered leaves on ground
+                    drawRect(ctx, x + 2, y + 26, 3, 2, leafGreen);
+                    drawRect(ctx, x + 48, y + 27, 3, 2, leafDark);
+                    drawRect(ctx, x + 46, y + 24, 2, 3, leafGreen);
+                    drawRect(ctx, x, y + 23, 3, 2, leafLight);
+                    break;
+            }
+        }
+        
+        function drawStartScreen() {
+            startCtx.clearRect(0, 0, startCanvas.width, startCanvas.height);
+            
+            // Background
+            const gradient = startCtx.createLinearGradient(0, 0, 0, startCanvas.height);
+            gradient.addColorStop(0, '#5C94FC');
+            gradient.addColorStop(1, '#2a4d8f');
+            startCtx.fillStyle = gradient;
+            startCtx.fillRect(0, 0, startCanvas.width, startCanvas.height);
+            
+            // Ground - Tel Aviv sidewalk style
+            drawRect(startCtx, 0, GROUND_Y, startCanvas.width, 60, '#6B7280');
+            
+            // Blue-white curb markings - BIGGER
+            const segmentWidth = 50;
+            const curbHeight = 20;
+            for (let i = 0; i < startCanvas.width / segmentWidth + 1; i++) {
+                if (i % 2 === 0) {
+                    drawRect(startCtx, i * segmentWidth, GROUND_Y + 40, segmentWidth, curbHeight, '#0066CC');
+                } else {
+                    drawRect(startCtx, i * segmentWidth, GROUND_Y + 40, segmentWidth, curbHeight, '#FFFFFF');
+                }
+            }
+            
+            // Sidewalk cracks
+            startCtx.strokeStyle = '#4B5563';
+            startCtx.lineWidth = 2;
+            for (let i = 0; i < 10; i++) {
+                startCtx.beginPath();
+                startCtx.moveTo(i * 70, GROUND_Y);
+                startCtx.lineTo(i * 70, GROUND_Y + 40);
+                startCtx.stroke();
+            }
+            
+            // Road below sidewalk - asphalt with lane markings
+            const roadY = GROUND_Y + 60;
+            const roadHeight = startCanvas.height - GROUND_Y - 60;
+            
+            // Dark asphalt
+            drawRect(startCtx, 0, roadY, startCanvas.width, roadHeight, '#3a3a3a');
+            
+            // Road lane markings - dashed white lines in center
+            startCtx.fillStyle = '#FFF';
+            for (let i = 0; i < startCanvas.width; i += 40) {
+                drawRect(startCtx, i, roadY + 10, 25, 3, '#FFFFFF');
+            }
+            
+            // Clouds - keep away from center logo
+            drawCloud(startCtx, { x: 50, y: 60 });
+            drawCloud(startCtx, { x: 520, y: 80 });
+            
+            // Tel Aviv logo in center top - CENTERED
+            drawTelAvivLogo(startCtx, startCanvas.width / 2 - 80, 20, 160);
+            
+            // Tel Aviv Skyline in background
+            const startBuildings = [
+                { x: 20, y: 300, width: 30, height: 80, color: '#BDB76B', type: 'bauhaus' },
+                { x: 55, y: 250, width: 35, height: 130, color: '#708090', type: 'round' },
+                { x: 95, y: 270, width: 30, height: 110, color: '#778899', type: 'triangle' },
+                { x: 130, y: 260, width: 35, height: 120, color: '#696969', type: 'square' },
+                { x: 170, y: 285, width: 28, height: 95, color: '#D2B48C', type: 'bauhaus' },
+                { x: 203, y: 290, width: 30, height: 90, color: '#4682B4', type: 'modern' },
+                { x: 238, y: 280, width: 28, height: 100, color: '#5F9EA0', type: 'modern' },
+                { x: 271, y: 295, width: 26, height: 85, color: '#8B7355', type: 'bauhaus' },
+                { x: 302, y: 300, width: 30, height: 80, color: '#D2B48C', type: 'bauhaus' },
+                { x: 337, y: 290, width: 30, height: 90, color: '#BDB76B', type: 'bauhaus' },
+                { x: 372, y: 270, width: 33, height: 110, color: '#708090', type: 'modern' },
+                { x: 410, y: 285, width: 28, height: 95, color: '#778899', type: 'modern' },
+                { x: 443, y: 280, width: 30, height: 100, color: '#4682B4', type: 'modern' },
+                { x: 478, y: 295, width: 35, height: 85, color: '#8B7355', type: 'modern' },
+                { x: 518, y: 280, width: 30, height: 100, color: '#A0826D', type: 'modern' },
+                { x: 553, y: 285, width: 32, height: 95, color: '#4682B4', type: 'modern' },
+                { x: 590, y: 290, width: 28, height: 90, color: '#BDB76B', type: 'bauhaus' },
+                { x: 623, y: 275, width: 30, height: 105, color: '#5F9EA0', type: 'modern' }
+            ];
+            
+            for (let building of startBuildings) {
+                drawBuilding(startCtx, building);
+            }
+            
+            // Tel Aviv logo in center top
+            drawTelAvivLogo(startCtx, startCanvas.width / 2 - 80, 20, 160);
+            
+            // Title - NEW NAME
+            startCtx.fillStyle = '#FFD700';
+            startCtx.strokeStyle = '#000';
+            startCtx.lineWidth = 4;
+            startCtx.font = 'bold 32px Rubik';
+            startCtx.textAlign = 'center';
+            startCtx.strokeText('אתגר העגלה', startCanvas.width / 2, 200);
+            startCtx.fillText('אתגר העגלה', startCanvas.width / 2, 200);
+            
+            startCtx.fillStyle = '#FFF';
+            startCtx.font = '16px Rubik';
+            startCtx.fillText('הגרסה התל אביבית', startCanvas.width / 2, 225);
+            
+            // Start button
+            startButtonBounce += 0.1;
+            const buttonY = 300 + Math.sin(startButtonBounce) * 5;
+            
+            drawRect(startCtx, 224, buttonY + 4, 192, 52, '#000');
+            
+            const btnGradient = startCtx.createLinearGradient(220, buttonY, 220, buttonY + 48);
+            btnGradient.addColorStop(0, '#90EE90');
+            btnGradient.addColorStop(1, '#228B22');
+            startCtx.fillStyle = btnGradient;
+            startCtx.fillRect(220, buttonY, 200, 48);
+            
+            startCtx.strokeStyle = '#1a5c1a';
+            startCtx.lineWidth = 4;
+            startCtx.strokeRect(220, buttonY, 200, 48);
+            
+            startCtx.fillStyle = '#FFF';
+            startCtx.font = 'bold 24px Rubik';
+            startCtx.fillText('START', startCanvas.width / 2, buttonY + 32);
+            
+            startCtx.font = '11px Rubik';
+            startCtx.fillStyle = '#FFF';
+            startCtx.fillText('רווח להתחלה', startCanvas.width / 2, 395);
+            
+            if (highScore > 0) {
+                // High score below the START button
+                startCtx.fillStyle = '#FFD700';
+                startCtx.font = 'bold 16px Rubik';
+                startCtx.strokeStyle = '#000';
+                startCtx.lineWidth = 3;
+                startCtx.strokeText(`🏆 שיא: ${highScore}`, startCanvas.width / 2, 260);
+                startCtx.fillText(`🏆 שיא: ${highScore}`, startCanvas.width / 2, 260);
+            }
+        }
+        
+        function createObstacle() {
+            const type = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
+            
+            let yPos;
+            if (type.flying) {
+                // Birds at varied heights - sometimes high (need jump), sometimes low (need duck)
+                const birdType = Math.random();
+                if (birdType < 0.4) {
+                    // Low birds - need to duck
+                    yPos = GROUND_Y - 80 - Math.random() * 20;
+                } else {
+                    // High birds - need to jump
+                    yPos = GROUND_Y - 50 - Math.random() * 15;
+                }
+            } else {
+                yPos = GROUND_Y - type.height;
+            }
+            
+            obstacles.push({
+                x: canvas.width + 50,
+                y: yPos,
+                type: type
+            });
+        }
+        
+        function update() {
+            if (!gameRunning) return;
+            
+            frameCount++;
+            bgScroll += gameSpeed;
+            distance += 1;
+            
+            // Duck control
+            if (keys['ArrowDown'] || keys['s'] || keys['S']) {
+                player.isDucking = true;
+                player.height = player.duckHeight;
+            } else {
+                player.isDucking = false;
+                player.height = player.normalHeight;
+            }
+            
+            // Duck control
+            if (keys['ArrowDown'] || keys['s'] || keys['S']) {
+                player.isDucking = true;
+                player.height = player.duckHeight;
+            } else {
+                player.isDucking = false;
+                player.height = player.normalHeight;
+            }
+            
+            // Physics
+            player.velocityY += GRAVITY;
+            player.y += player.velocityY;
+            
+            // Ground collision
+            if (player.y > GROUND_Y - player.height) {
+                player.y = GROUND_Y - player.height;
+                player.velocityY = 0;
+                player.isJumping = false;
+            }
+            
+            // Update clouds
+            for (let cloud of clouds) {
+                cloud.x -= cloud.speed;
+                if (cloud.x < -cloud.width) {
+                    cloud.x = canvas.width + 20;
+                }
+            }
+            
+            // Update buildings - loop them
+            for (let building of buildings) {
+                building.x -= gameSpeed * 0.3;
+                if (building.x < -building.width - 50) {
+                    building.x = canvas.width + 50;
+                }
+            }
+            
+            // Update obstacles
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                obstacles[i].x -= gameSpeed;
+                
+                if (obstacles[i].x < -obstacles[i].type.width) {
+                    const basePoints = obstacles[i].type.points;
+                    
+                    // Combo system
+                    player.comboCount++;
+                    let comboBonus = 0;
+                    if (player.comboCount >= 5) comboBonus = 10;
+                    if (player.comboCount >= 10) comboBonus = 20;
+                    if (player.comboCount >= 15) comboBonus = 50;
+                    
+                    score += basePoints + comboBonus;
+                    distance += 5;
+                    
+                    obstacles.splice(i, 1);
+                }
+            }
+            
+            // Check collisions
+            for (let obstacle of obstacles) {
+                const playerRight = player.x + player.width - 10;
+                const playerLeft = player.x + 10;
+                const playerTop = player.y + 5;
+                const playerBottom = player.y + player.height - 3;
+                
+                const obsRight = obstacle.x + obstacle.type.width;
+                const obsLeft = obstacle.x;
+                const obsTop = obstacle.y;
+                const obsBottom = obstacle.y + obstacle.type.height;
+                
+                if (playerRight > obsLeft && playerLeft < obsRight &&
+                    playerBottom > obsTop && playerTop < obsBottom) {
+                    player.comboCount = 0; // Reset combo on hit
+                    gameOver();
+                }
+            }
+            
+            // Create obstacles - MORE FREQUENT as game progresses
+            const baseInterval = 80;
+            const speedReduction = Math.floor(gameSpeed * 3);
+            const scoreReduction = Math.floor(score / 100) * 5; // More obstacles every 100 points
+            const finalInterval = Math.max(baseInterval - speedReduction - scoreReduction, 20);
+            
+            if (frameCount % finalInterval === 0) {
+                createObstacle();
+                
+                // Chance of double obstacle at higher scores
+                if (score > 200 && Math.random() > 0.7) {
+                    setTimeout(() => createObstacle(), 300);
+                }
+                
+                // Chance of triple obstacle at very high scores
+                if (score > 400 && Math.random() > 0.8) {
+                    setTimeout(() => {
+                        createObstacle();
+                        createObstacle();
+                    }, 200);
+                }
+            }
+            
+            // Increase difficulty
+            if (frameCount % 500 === 0 && gameSpeed < 10) {
+                gameSpeed += 0.3;
+            }
+            
+            // Update UI
+            document.getElementById('score').textContent = score;
+            document.getElementById('distance').textContent = Math.floor(distance / 10);
+        }
+        
+        function draw() {
+            // Sky
+            ctx.fillStyle = '#5C94FC';
+            ctx.fillRect(0, 0, canvas.width, GROUND_Y);
+            
+            // Tel Aviv logo in top right corner - BIGGER
+            drawTelAvivLogo(ctx, canvas.width - 120, 10, 110);
+            
+            // Clouds
+            for (let cloud of clouds) {
+                drawCloud(ctx, cloud);
+            }
+            
+            // Buildings
+            for (let building of buildings) {
+                drawBuilding(ctx, building);
+            }
+            
+            // Ground - Tel Aviv style sidewalk
+            // Asphalt gray sidewalk
+            drawRect(ctx, 0, GROUND_Y, canvas.width, 60, '#6B7280');
+            
+            // Blue-white curb markings (like in the photo) - BIGGER AND MORE VISIBLE
+            const curbHeight = 20;
+            const segmentWidth = 50;
+            
+            for (let i = 0; i < canvas.width / segmentWidth + 2; i++) {
+                const x = (i * segmentWidth - (bgScroll * 0.8) % segmentWidth);
+                if (i % 2 === 0) {
+                    drawRect(ctx, x, GROUND_Y + 40, segmentWidth, curbHeight, '#0066CC'); // Blue
+                } else {
+                    drawRect(ctx, x, GROUND_Y + 40, segmentWidth, curbHeight, '#FFFFFF'); // White
+                }
+            }
+            
+            // Sidewalk cracks and texture
+            ctx.strokeStyle = '#4B5563';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 10; i++) {
+                const xPos = ((i * 70 - bgScroll * 0.5) % canvas.width);
+                ctx.beginPath();
+                ctx.moveTo(xPos, GROUND_Y);
+                ctx.lineTo(xPos, GROUND_Y + 40);
+                ctx.stroke();
+            }
+            
+            // Random spots and stains on sidewalk
+            ctx.fillStyle = 'rgba(0,0,0,0.1)';
+            for (let i = 0; i < 15; i++) {
+                const xPos = ((i * 43 + bgScroll) % canvas.width);
+                const yPos = GROUND_Y + 5 + ((i * 7) % 30);
+                drawRect(ctx, xPos, yPos, 6, 4, 'rgba(0,0,0,0.15)');
+            }
+            
+            // Road below sidewalk - asphalt with animated lane markings
+            const roadY = GROUND_Y + 60;
+            const roadHeight = canvas.height - GROUND_Y - 60;
+            
+            // Dark asphalt
+            drawRect(ctx, 0, roadY, canvas.width, roadHeight, '#3a3a3a');
+            
+            // Animated road lane markings
+            ctx.fillStyle = '#FFF';
+            for (let i = 0; i < canvas.width / 40 + 2; i++) {
+                const markX = (i * 40 - (bgScroll * 1.5) % 40);
+                drawRect(ctx, markX, roadY + 10, 25, 3, '#FFFFFF');
+            }
+            
+            // Obstacles
+            for (let obstacle of obstacles) {
+                drawObstacle(ctx, obstacle);
+            }
+            
+            // Player
+            drawPlayer(ctx);
+            
+            // In-game score panel - retro arcade style
+            // Background panel
+            drawRect(ctx, 10, 10, 200, 90, 'rgba(0,0,0,0.7)');
+            drawRect(ctx, 10, 10, 200, 3, '#FFD700');
+            drawRect(ctx, 10, 97, 200, 3, '#FFD700');
+            
+            // Score text
+            ctx.fillStyle = '#FFD700';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText('ניקוד:', 20, 30);
+            ctx.fillStyle = '#FFF';
+            ctx.font = 'bold 20px Arial';
+            ctx.fillText(score.toString(), 20, 55);
+            
+            // Distance
+            ctx.fillStyle = '#90EE90';
+            ctx.font = 'bold 12px Arial';
+            ctx.fillText(`מרחק: ${Math.floor(distance / 10)}מ׳`, 20, 75);
+            
+            // Combo display in panel if active
+            if (player.comboCount >= 3) {
+                ctx.fillStyle = player.comboCount >= 15 ? '#FF69B4' : 
+                               player.comboCount >= 10 ? '#00CED1' : '#FFD700';
+                ctx.font = 'bold 14px Arial';
+                ctx.fillText(`🔥 x${player.comboCount}`, 20, 92);
+            }
+            
+            // Big combo display in center if 5+
+            if (player.comboCount >= 5) {
+                ctx.fillStyle = '#FFD700';
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 3;
+                ctx.font = 'bold 24px Arial';
+                ctx.textAlign = 'center';
+                const comboText = `COMBO x${player.comboCount}!`;
+                ctx.strokeText(comboText, canvas.width / 2, 100);
+                ctx.fillText(comboText, canvas.width / 2, 100);
+                
+                // Bonus indicator
+                if (player.comboCount >= 15) {
+                    ctx.fillStyle = '#FF69B4';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.strokeText('+50 בונוס!', canvas.width / 2, 130);
+                    ctx.fillText('+50 בונוס!', canvas.width / 2, 130);
+                } else if (player.comboCount >= 10) {
+                    ctx.fillStyle = '#00CED1';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.strokeText('+20 בונוס!', canvas.width / 2, 130);
+                    ctx.fillText('+20 בונוס!', canvas.width / 2, 130);
+                } else if (player.comboCount >= 5) {
+                    ctx.fillStyle = '#90EE90';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.strokeText('+10 בונוס!', canvas.width / 2, 130);
+                    ctx.fillText('+10 בונוס!', canvas.width / 2, 130);
+                }
+            }
+        }
+        
+        function gameOver() {
+            gameRunning = false;
+            gameState = 'gameover';
+            
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('tlvStrollerHighScore', highScore);
+                document.getElementById('highScore').textContent = highScore;
+            }
+            
+            document.getElementById('finalScore').innerHTML = 
+                `עברת ${Math.floor(distance / 10)} מטרים<br><br>צברת ${score} נקודות!`;
+            document.getElementById('gameOverScreen').classList.add('active');
+        }
+        
+        function restartGame() {
+            gameState = 'playing';
+            gameRunning = true;
+            score = 0;
+            distance = 0;
+            gameSpeed = 6;
+            frameCount = 0;
+            bgScroll = 0;
+            obstacles.length = 0;
+            player.x = canvas.width / 2 - 16;
+            player.y = GROUND_Y - player.normalHeight;
+            player.velocityY = 0;
+            player.isJumping = false;
+            player.isDucking = false;
+            player.height = player.normalHeight;
+            player.comboCount = 0;
+            
+            document.getElementById('gameOverScreen').classList.remove('active');
+            document.getElementById('score').textContent = 0;
+            document.getElementById('distance').textContent = 0;
+        }
+        
+        function gameLoop() {
+            if (gameState === 'start') {
+                drawStartScreen();
+            } else if (gameState === 'playing') {
+                update();
+                draw();
+            } else if (gameState === 'gameover') {
+                draw();
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        initBackground();
+        gameLoop();
+    </script>
+</body>
+</html>
