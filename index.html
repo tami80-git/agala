@@ -1354,15 +1354,18 @@
             // Ground - Tel Aviv sidewalk style
             drawRect(startCtx, 0, GROUND_Y, startCanvas.width, 60, '#6B7280');
             
-            // Blue-white curb markings - BIGGER
+            // Alternating blue-white and red-white curb sections (Israeli style!)
             const segmentWidth = 50;
             const curbHeight = 20;
             for (let i = 0; i < startCanvas.width / segmentWidth + 1; i++) {
-                if (i % 2 === 0) {
-                    drawRect(startCtx, i * segmentWidth, GROUND_Y + 40, segmentWidth, curbHeight, '#0066CC');
-                } else {
-                    drawRect(startCtx, i * segmentWidth, GROUND_Y + 40, segmentWidth, curbHeight, '#FFFFFF');
+                const sectionIndex = Math.floor(i / 2) % 2; // Every 2 segments switch color
+                let color;
+                if (i % 2 === 0) { // Colored segment
+                    color = sectionIndex === 0 ? '#0066CC' : '#FF0000'; // Blue or Red
+                } else { // White segment
+                    color = '#FFFFFF';
                 }
+                drawRect(startCtx, i * segmentWidth, GROUND_Y + 40, segmentWidth, curbHeight, color);
             }
             
             // Sidewalk cracks
@@ -1660,17 +1663,20 @@
             // Asphalt gray sidewalk
             drawRect(ctx, 0, GROUND_Y, canvas.width, 60, '#6B7280');
             
-            // Blue-white curb markings (like in the photo) - BIGGER AND MORE VISIBLE
+            // Alternating blue-white and red-white curb sections (Israeli style!)
             const curbHeight = 20;
             const segmentWidth = 50;
             
             for (let i = 0; i < canvas.width / segmentWidth + 2; i++) {
                 const x = (i * segmentWidth - (bgScroll * 0.8) % segmentWidth);
-                if (i % 2 === 0) {
-                    drawRect(ctx, x, GROUND_Y + 40, segmentWidth, curbHeight, '#0066CC'); // Blue
-                } else {
-                    drawRect(ctx, x, GROUND_Y + 40, segmentWidth, curbHeight, '#FFFFFF'); // White
+                const sectionIndex = Math.floor(i / 2) % 2; // Every 2 segments switch color
+                let color;
+                if (i % 2 === 0) { // Colored segment
+                    color = sectionIndex === 0 ? '#0066CC' : '#FF0000'; // Blue or Red
+                } else { // White segment
+                    color = '#FFFFFF';
                 }
+                drawRect(ctx, x, GROUND_Y + 40, segmentWidth, curbHeight, color);
             }
             
             // Sidewalk cracks and texture
