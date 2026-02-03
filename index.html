@@ -130,16 +130,75 @@
             color: #fff;
             padding: 12px 30px;
             font-size: 14px;
+            font-weight: bold;
             text-align: center;
             line-height: 1.8;
             border-radius: 8px;
             border: 2px solid #FFD700;
         }
         
-        @media (max-width: 768px) {
+        /* Mobile controls - hidden by default */
+        .mobile-controls {
+            position: absolute;
+            bottom: 80px;
+            left: 0;
+            right: 0;
+            display: none;
+            justify-content: center;
+            gap: 60px;
+            padding: 0 20px;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        
+        .touch-button {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            border: 5px solid #000;
+            color: #000;
+            font-size: 14px;
+            font-weight: bold;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            pointer-events: all;
+            user-select: none;
+            box-shadow: 0 6px 0 rgba(0,0,0,0.7), 0 8px 20px rgba(0,0,0,0.3);
+            transition: all 0.1s;
+        }
+        
+        .touch-button:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 rgba(0,0,0,0.7);
+            background: linear-gradient(135deg, #FFA500 0%, #FF8C00 100%);
+        }
+        
+        .touch-button span {
+            font-size: 28px;
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+        
+        /* Show controls only on touch devices during gameplay */
+        @media (hover: none) and (pointer: coarse) {
+            .mobile-controls.active {
+                display: flex !important;
+            }
             .controls-text {
-                font-size: 12px;
-                padding: 12px 24px;
+                display: none;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .mobile-controls.active {
+                display: flex !important;
+            }
+            .controls-text {
+                display: none;
             }
         }
     </style>
@@ -164,8 +223,17 @@
             <button class="pixel-button" onclick="restartGame()">לשחק שוב</button>
         </div>
         
-        <div class="controls-text" style="font-size: 14px; font-weight: bold; padding: 15px 25px; margin-bottom: 20px;">
-            ⬆️ רווח = קפיצה  |  ⬇️ חץ למטה = כריעה
+        <div class="controls-text">
+            רווח = קפיצה  |  חץ למטה = כריעה
+        </div>
+        
+        <div class="mobile-controls" id="mobileControls">
+            <div class="touch-button jump" id="jumpButton">
+                ⬆️<br>קפיצה
+            </div>
+            <div class="touch-button duck" id="duckButton">
+                ⬇️<br>כריעה
+            </div>
         </div>
     </div>
 
@@ -246,10 +314,8 @@
         const jumpButton = document.getElementById('jumpButton');
         const duckButton = document.getElementById('duckButton');
         
-        // Only add event listeners if buttons exist
-        if (jumpButton && duckButton) {
-            // Jump button
-            jumpButton.addEventListener('touchstart', (e) => {
+        // Jump button
+        jumpButton.addEventListener('touchstart', (e) => {
             e.preventDefault();
             if (gameRunning && !player.isJumping) {
                 player.velocityY = JUMP_FORCE;
@@ -294,7 +360,6 @@
         duckButton.addEventListener('mouseleave', (e) => {
             keys['ArrowDown'] = false;
         });
-        } // End of mobile controls check
         
         startCanvas.addEventListener('click', (e) => {
             if (gameState === 'start') {
@@ -378,6 +443,12 @@
             gameState = 'playing';
             gameRunning = true;
             document.getElementById('startScreen').classList.add('hidden');
+            
+            // Show mobile controls during gameplay
+            const mobileControls = document.getElementById('mobileControls');
+            if (mobileControls) {
+                mobileControls.classList.add('active');
+            }
             
             score = 0;
             distance = 0;
