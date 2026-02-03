@@ -1364,14 +1364,14 @@
             // Ground - Tel Aviv sidewalk style
             drawRect(startCtx, 0, GROUND_Y, startCanvas.width, 60, '#6B7280');
             
-            // Mostly red-white curb with occasional blue-white sections (Israeli style!)
+            // Mostly red-white curb with rare blue-white sections (Israeli style!)
             const segmentWidth = 50;
             const curbHeight = 20;
             for (let i = 0; i < startCanvas.width / segmentWidth + 1; i++) {
-                const sectionIndex = Math.floor(i / 8) % 5; // Every 8 segments, cycle through 5 sections (4 red, 1 blue)
+                const sectionIndex = Math.floor(i / 8) % 5; // Every 8 segments, cycle through 5 sections
                 let color;
                 if (i % 2 === 0) { // Colored segment
-                    color = sectionIndex === 0 ? '#0066CC' : '#FF0000'; // Blue only for section 0, red for 1-4
+                    color = sectionIndex === 4 ? '#0066CC' : '#FF0000'; // Blue only at position 4 (1 out of 5), rest is red
                 } else { // White segment
                     color = '#FFFFFF';
                 }
@@ -1712,16 +1712,16 @@
             // Asphalt gray sidewalk
             drawRect(ctx, 0, GROUND_Y, canvas.width, 60, '#6B7280');
             
-            // Mostly red-white curb with occasional blue-white sections (Israeli style!)
+            // Mostly red-white curb with rare blue-white sections (Israeli style!)
             const curbHeight = 20;
             const segmentWidth = 50;
             
             for (let i = 0; i < canvas.width / segmentWidth + 2; i++) {
                 const x = (i * segmentWidth - (bgScroll * 0.8) % segmentWidth);
-                const sectionIndex = Math.floor(i / 8) % 5; // Every 8 segments, cycle through 5 sections (4 red, 1 blue)
+                const sectionIndex = Math.floor(i / 8) % 5; // Every 8 segments, cycle through 5 sections
                 let color;
                 if (i % 2 === 0) { // Colored segment
-                    color = sectionIndex === 0 ? '#0066CC' : '#FF0000'; // Blue only for section 0, red for 1-4
+                    color = sectionIndex === 4 ? '#0066CC' : '#FF0000'; // Blue only at position 4 (1 out of 5), rest is red
                 } else { // White segment
                     color = '#FFFFFF';
                 }
