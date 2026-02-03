@@ -271,6 +271,7 @@
                 width: 100vw !important;
                 height: 100vh !important;
                 position: fixed;
+                background: #000 !important;
             }
             
             .game-container {
@@ -285,6 +286,7 @@
                 position: fixed;
                 top: 0;
                 left: 0;
+                background: #000 !important;
             }
             
             canvas {
@@ -300,6 +302,12 @@
                 position: absolute;
                 top: 0;
                 left: 0;
+                background: transparent !important;
+            }
+            
+            /* Hide any overflow elements */
+            .ui-overlay ~ * {
+                overflow: hidden !important;
             }
             
             /* Compact score overlay - ALWAYS ON TOP with better visibility */
