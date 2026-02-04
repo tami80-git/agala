@@ -428,6 +428,49 @@
         let gameSpeed = 4;
         let bgScroll = 0;
         
+        // Level system! 🎮
+        let currentLevel = 1;
+        let levelJustChanged = false;
+        let levelAnnouncementTimer = 0;
+        const LEVEL_DISTANCE = 50; // Every 50 meters = new level (super fast progression!)
+        
+        const levels = [
+            { 
+                id: 1, 
+                name: 'התחלה רגילה',
+                weather: 'normal',
+                strollerType: 'single'
+            },
+            { 
+                id: 2, 
+                name: 'יום גשום',
+                weather: 'rain',
+                strollerType: 'single'
+            },
+            { 
+                id: 3, 
+                name: 'שמש קופחת',
+                weather: 'hot',
+                strollerType: 'single'
+            },
+            { 
+                id: 4, 
+                name: 'עגלת תאומים!',
+                weather: 'normal',
+                strollerType: 'double'
+            },
+            { 
+                id: 5, 
+                name: 'כאוס תל אביבי',
+                weather: 'normal',
+                strollerType: 'double'
+            }
+        ];
+        
+        // Weather effects
+        let rainDrops = [];
+        let puddles = [];
+        
         const GROUND_Y = 380;
         const GRAVITY = 0.6;
         const JUMP_FORCE = -14;
@@ -452,14 +495,18 @@
         // Obstacles
         const obstacles = [];
         const obstacleTypes = [
-            { name: 'trash_orange', color: '#FF8C00', width: 30, height: 40, canJump: true, points: 10 },
-            { name: 'trash_blue', color: '#2E5C8A', width: 30, height: 40, canJump: true, points: 10 },
-            { name: 'trash_green', color: '#4A7C4E', width: 30, height: 40, canJump: true, points: 10 },
-            { name: 'poop', color: '#8B4513', width: 24, height: 20, canJump: true, points: 15 },
-            { name: 'bike_lying', color: '#C41E3A', width: 45, height: 25, canJump: true, points: 18 },
-            { name: 'branches', color: '#8B4513', width: 50, height: 30, canJump: true, points: 16 },
-            { name: 'scooter', color: '#00CED1', width: 28, height: 40, canJump: true, points: 12 },
-            { name: 'bird', color: '#8B4500', width: 30, height: 20, canJump: false, points: 20, flying: true }
+            { name: 'trash_orange', color: '#FF8C00', width: 30, height: 40, canJump: true, points: 10, minLevel: 1 },
+            { name: 'trash_blue', color: '#2E5C8A', width: 30, height: 40, canJump: true, points: 10, minLevel: 1 },
+            { name: 'trash_green', color: '#4A7C4E', width: 30, height: 40, canJump: true, points: 10, minLevel: 1 },
+            { name: 'poop', color: '#8B4513', width: 24, height: 20, canJump: true, points: 15, minLevel: 1 },
+            { name: 'bike_lying', color: '#C41E3A', width: 45, height: 25, canJump: true, points: 18, minLevel: 2 },
+            { name: 'branches', color: '#8B4513', width: 50, height: 30, canJump: true, points: 16, minLevel: 2 },
+            { name: 'scooter', color: '#00CED1', width: 28, height: 40, canJump: true, points: 12, minLevel: 2 },
+            { name: 'bird', color: '#8B4500', width: 30, height: 20, canJump: false, points: 20, flying: true, minLevel: 3 },
+            // NEW LEVEL 5 OBSTACLES! 🚗🍕🚧
+            { name: 'parked_car', color: '#C0C0C0', width: 80, height: 50, canJump: false, points: 30, minLevel: 5 },
+            { name: 'pizza_box', color: '#CD853F', width: 35, height: 15, canJump: true, points: 12, minLevel: 5 },
+            { name: 'traffic_cone', color: '#FF6600', width: 20, height: 35, canJump: true, points: 14, minLevel: 5 }
         ];
         
         // Background elements
@@ -638,8 +685,163 @@
             player.isJumping = false;
             player.isDucking = false;
             player.height = player.normalHeight;
-            player.jumpsRemaining = player.maxJumps;  // Reset double jump
+            player.jumpsRemaining = player.maxJumps;
             player.comboCount = 0;
+            
+            // Reset level system
+            currentLevel = 1;
+            levelJustChanged = false;
+            levelAnnouncementTimer = 0;
+            rainDrops = [];
+            puddles = [];
+        }
+        
+        // Level system functions
+        function checkLevelProgress() {
+            const distanceInMeters = Math.floor(distance / 10);
+            const newLevel = Math.min(5, Math.floor(distanceInMeters / LEVEL_DISTANCE) + 1);
+            
+            if (newLevel > currentLevel && newLevel <= 5) {
+                currentLevel = newLevel;
+                levelJustChanged = true;
+                levelAnnouncementTimer = 180; // Show for 3 seconds (60fps)
+                
+                // Apply level changes
+                const level = levels[currentLevel - 1];
+                
+                // Speed increase with each level
+                gameSpeed += 0.5;
+                
+                // Initialize weather effects
+                if (level.weather === 'rain' && rainDrops.length === 0) {
+                    // Create initial rain
+                    for (let i = 0; i < 50; i++) {
+                        rainDrops.push({
+                            x: Math.random() * canvas.width,
+                            y: Math.random() * canvas.height,
+                            speed: 8 + Math.random() * 4
+                        });
+                    }
+                }
+            }
+            
+            if (levelAnnouncementTimer > 0) {
+                levelAnnouncementTimer--;
+                if (levelAnnouncementTimer === 0) {
+                    levelJustChanged = false;
+                }
+            }
+        }
+        
+        function drawLevelAnnouncement(ctx) {
+            if (levelAnnouncementTimer > 0) {
+                const level = levels[currentLevel - 1];
+                const alpha = levelAnnouncementTimer > 150 ? 1 : levelAnnouncementTimer / 150;
+                
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                
+                // Background
+                ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                ctx.fillRect(canvas.width/2 - 200, canvas.height/2 - 60, 400, 120);
+                
+                // Border
+                ctx.strokeStyle = '#FFD700';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(canvas.width/2 - 200, canvas.height/2 - 60, 400, 120);
+                
+                // Level number
+                ctx.fillStyle = '#FFD700';
+                ctx.font = 'bold 32px Rubik';
+                ctx.textAlign = 'center';
+                ctx.fillText(`שלב ${currentLevel}`, canvas.width/2, canvas.height/2 - 10);
+                
+                // Level name
+                ctx.fillStyle = '#FFF';
+                ctx.font = 'bold 24px Rubik';
+                ctx.fillText(level.name, canvas.width/2, canvas.height/2 + 30);
+                
+                ctx.restore();
+            }
+        }
+        
+        function updateAndDrawWeather(ctx) {
+            const level = levels[currentLevel - 1];
+            
+            if (level.weather === 'rain') {
+                // Update rain
+                for (let drop of rainDrops) {
+                    drop.y += drop.speed;
+                    if (drop.y > canvas.height) {
+                        drop.y = -10;
+                        drop.x = Math.random() * canvas.width;
+                    }
+                }
+                
+                // Draw rain
+                ctx.strokeStyle = 'rgba(173, 216, 230, 0.6)';
+                ctx.lineWidth = 2;
+                for (let drop of rainDrops) {
+                    ctx.beginPath();
+                    ctx.moveTo(drop.x, drop.y);
+                    ctx.lineTo(drop.x, drop.y + 10);
+                    ctx.stroke();
+                }
+                
+                // Create puddles occasionally
+                if (frameCount % 120 === 0 && puddles.length < 3) {
+                    puddles.push({
+                        x: canvas.width + 100,
+                        y: GROUND_Y,
+                        width: 60,
+                        height: 8
+                    });
+                }
+                
+                // Draw and move puddles
+                for (let i = puddles.length - 1; i >= 0; i--) {
+                    let puddle = puddles[i];
+                    puddle.x -= gameSpeed;
+                    
+                    // Draw puddle
+                    ctx.fillStyle = 'rgba(100, 150, 200, 0.5)';
+                    ctx.beginPath();
+                    ctx.ellipse(puddle.x, puddle.y, puddle.width/2, puddle.height/2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Remove if off screen
+                    if (puddle.x < -100) {
+                        puddles.splice(i, 1);
+                    }
+                }
+            }
+            
+            if (level.weather === 'hot') {
+                // Draw hot sun
+                const sunX = canvas.width - 80;
+                const sunY = 60;
+                
+                // Sun rays (animated)
+                ctx.strokeStyle = 'rgba(255, 200, 0, 0.4)';
+                ctx.lineWidth = 3;
+                for (let i = 0; i < 12; i++) {
+                    const angle = (i * 30 + frameCount * 0.5) * Math.PI / 180;
+                    ctx.beginPath();
+                    ctx.moveTo(sunX + Math.cos(angle) * 25, sunY + Math.sin(angle) * 25);
+                    ctx.lineTo(sunX + Math.cos(angle) * 40, sunY + Math.sin(angle) * 40);
+                    ctx.stroke();
+                }
+                
+                // Sun circle
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath();
+                ctx.arc(sunX, sunY, 25, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Yellow tint overlay
+                ctx.fillStyle = 'rgba(255, 200, 0, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
         }
         
         // Draw functions
@@ -890,8 +1092,14 @@
             const y = player.y;
             const runFrame = Math.floor(frameCount / 6) % 2;
             
+            // Check if we're in double stroller level! 👶👶
+            const level = levels[currentLevel - 1];
+            const isDoubleStroller = level && level.strollerType === 'double';
+            const strollerWidth = isDoubleStroller ? 35 : 20; // Wider for twins!
+            const strollerOffset = isDoubleStroller ? 7 : 0; // Adjust positions
+            
             // Shadow - bigger for stroller
-            drawRect(ctx, x + 2, GROUND_Y - 2, 50, 4, 'rgba(0,0,0,0.3)');
+            drawRect(ctx, x + 2, GROUND_Y - 2, 50 + strollerOffset, 4, 'rgba(0,0,0,0.3)');
             
             if (player.isDucking) {
                 // Ducking pose - horizontal
@@ -927,27 +1135,27 @@
                 drawRect(ctx, x + 44, y + 35, 2, 5, '#7F8C8D');
                 
                 // Lower basket/storage - dark blue
-                drawRect(ctx, x + 28, y + 32, 20, 8, '#2C3E50');
-                drawRect(ctx, x + 29, y + 33, 18, 2, '#34495E'); // Highlight
+                drawRect(ctx, x + 28, y + 32, strollerWidth, 8, '#2C3E50');
+                drawRect(ctx, x + 29, y + 33, strollerWidth - 2, 2, '#34495E'); // Highlight
                 
                 // Main seat unit - navy blue with depth
-                drawRect(ctx, x + 30, y + 22, 20, 12, '#34495E');
-                drawRect(ctx, x + 31, y + 23, 18, 2, '#5D6D7E'); // Seat cushion highlight
+                drawRect(ctx, x + 30, y + 22, strollerWidth, 12, '#34495E');
+                drawRect(ctx, x + 31, y + 23, strollerWidth - 2, 2, '#5D6D7E'); // Seat cushion highlight
                 
                 // Seat padding detail
-                drawRect(ctx, x + 32, y + 25, 16, 8, '#5D6D7E');
-                drawRect(ctx, x + 33, y + 26, 14, 6, '#7F8C8D'); // Inner padding
+                drawRect(ctx, x + 32, y + 25, strollerWidth - 4, 8, '#5D6D7E');
+                drawRect(ctx, x + 33, y + 26, strollerWidth - 6, 6, '#7F8C8D'); // Inner padding
                 
                 // LARGE CANOPY/HOOD - major feature like in image
                 // Canopy back panel
-                drawRect(ctx, x + 28, y + 12, 22, 4, '#2C3E50');
+                drawRect(ctx, x + 28, y + 12, strollerWidth + 2, 4, '#2C3E50');
                 
                 // Canopy curved top
-                drawRect(ctx, x + 28, y + 8, 22, 6, '#34495E');
-                drawRect(ctx, x + 29, y + 9, 20, 4, '#5D6D7E'); // Canopy fabric texture
+                drawRect(ctx, x + 28, y + 8, strollerWidth + 2, 6, '#34495E');
+                drawRect(ctx, x + 29, y + 9, strollerWidth, 4, '#5D6D7E'); // Canopy fabric texture
                 
                 // Canopy front edge
-                drawRect(ctx, x + 28, y + 16, 22, 2, '#2C3E50');
+                drawRect(ctx, x + 28, y + 16, strollerWidth + 2, 2, '#2C3E50');
                 
                 // Canopy window/mesh detail
                 drawRect(ctx, x + 35, y + 10, 8, 3, '#95A5A6');
@@ -956,18 +1164,39 @@
                 drawRect(ctx, x + 24, y + 18, 4, 16, '#7F8C8D'); // Left handle bar
                 drawRect(ctx, x + 22, y + 18, 4, 6, '#8B4513'); // Left grip
                 
-                drawRect(ctx, x + 50, y + 18, 4, 16, '#7F8C8D'); // Right handle bar  
-                drawRect(ctx, x + 50, y + 18, 4, 6, '#8B4513'); // Right grip
+                drawRect(ctx, x + 50 + strollerOffset, y + 18, 4, 16, '#7F8C8D'); // Right handle bar  
+                drawRect(ctx, x + 50 + strollerOffset, y + 18, 4, 6, '#8B4513'); // Right grip
                 
-                // Baby visible in stroller - cute face peeking out
-                drawRect(ctx, x + 38, y + 24, 10, 8, '#FFD4A0'); // Baby head
-                drawRect(ctx, x + 39, y + 23, 8, 3, '#4B3621'); // Baby hair
-                drawRect(ctx, x + 40, y + 26, 2, 2, '#000'); // Left eye
-                drawRect(ctx, x + 44, y + 26, 2, 2, '#000'); // Right eye
-                drawRect(ctx, x + 42, y + 29, 2, 1, '#FFB6C1'); // Smile
-                
-                // Blanket visible
-                drawRect(ctx, x + 36, y + 30, 12, 4, '#87CEEB'); // Light blue blanket
+                // Baby/babies visible in stroller! 👶
+                if (isDoubleStroller) {
+                    // TWINS! Two babies side by side
+                    // Left baby
+                    drawRect(ctx, x + 32, y + 24, 9, 8, '#FFD4A0'); // Baby head
+                    drawRect(ctx, x + 33, y + 23, 7, 3, '#4B3621'); // Baby hair
+                    drawRect(ctx, x + 34, y + 26, 2, 2, '#000'); // Left eye
+                    drawRect(ctx, x + 37, y + 26, 2, 2, '#000'); // Right eye
+                    drawRect(ctx, x + 35, y + 29, 2, 1, '#FFB6C1'); // Smile
+                    
+                    // Right baby
+                    drawRect(ctx, x + 43, y + 24, 9, 8, '#FFD4A0'); // Baby head
+                    drawRect(ctx, x + 44, y + 23, 7, 3, '#8B4513'); // Different hair color!
+                    drawRect(ctx, x + 45, y + 26, 2, 2, '#000'); // Left eye
+                    drawRect(ctx, x + 48, y + 26, 2, 2, '#000'); // Right eye
+                    drawRect(ctx, x + 46, y + 29, 2, 1, '#FFB6C1'); // Smile
+                    
+                    // Blanket for both
+                    drawRect(ctx, x + 31, y + 30, 22, 4, '#FFC0CB'); // Pink blanket for twins!
+                } else {
+                    // Single baby
+                    drawRect(ctx, x + 38, y + 24, 10, 8, '#FFD4A0'); // Baby head
+                    drawRect(ctx, x + 39, y + 23, 8, 3, '#4B3621'); // Baby hair
+                    drawRect(ctx, x + 40, y + 26, 2, 2, '#000'); // Left eye
+                    drawRect(ctx, x + 44, y + 26, 2, 2, '#000'); // Right eye
+                    drawRect(ctx, x + 42, y + 29, 2, 1, '#FFB6C1'); // Smile
+                    
+                    // Blanket visible
+                    drawRect(ctx, x + 36, y + 30, 12, 4, '#87CEEB'); // Light blue blanket
+                }
                 
                 // Stroller details - cup holder
                 drawRect(ctx, x + 26, y + 28, 3, 4, '#2C3E50');
@@ -1348,6 +1577,68 @@
                     drawRect(ctx, x + 46, y + 24, 2, 3, leafGreen);
                     drawRect(ctx, x, y + 23, 3, 2, leafLight);
                     break;
+                    
+                // NEW LEVEL 5 OBSTACLES! 🚗🍕🚧
+                case 'parked_car':
+                    // Parked car blocking sidewalk - classic TLV!
+                    const carBody = '#C0C0C0';
+                    const carDark = '#808080';
+                    const carWindow = '#ADD8E6';
+                    
+                    // Main body
+                    drawRect(ctx, x + 10, y + 20, 60, 25, carBody);
+                    // Roof
+                    drawRect(ctx, x + 20, y + 10, 40, 12, carBody);
+                    // Windshield
+                    drawRect(ctx, x + 22, y + 12, 18, 8, carWindow);
+                    drawRect(ctx, x + 42, y + 12, 16, 8, carWindow);
+                    // Wheels
+                    drawRect(ctx, x + 15, y + 43, 12, 12, '#000');
+                    drawRect(ctx, x + 53, y + 43, 12, 12, '#000');
+                    // Headlights
+                    drawRect(ctx, x + 68, y + 28, 4, 6, '#FFFF00');
+                    // License plate
+                    drawRect(ctx, x + 65, y + 36, 8, 4, '#FFFFFF');
+                    break;
+                    
+                case 'pizza_box':
+                    // Pizza box on sidewalk - greasy cardboard
+                    const boxColor = '#CD853F';
+                    const pizzaRed = '#FF6347';
+                    const pizzaCheese = '#FFEB3B';
+                    
+                    // Box
+                    drawRect(ctx, x, y, 35, 15, boxColor);
+                    // Box details
+                    drawRect(ctx, x + 2, y + 2, 31, 11, '#DEB887');
+                    // "PIZZA" text suggestion
+                    drawRect(ctx, x + 8, y + 4, 6, 2, pizzaRed);
+                    drawRect(ctx, x + 16, y + 4, 6, 2, pizzaRed);
+                    drawRect(ctx, x + 24, y + 4, 4, 2, pizzaRed);
+                    // Grease stain
+                    drawRect(ctx, x + 18, y + 8, 8, 4, 'rgba(139, 69, 19, 0.3)');
+                    break;
+                    
+                case 'traffic_cone':
+                    // Orange construction cone
+                    const coneOrange = '#FF6600';
+                    const coneWhite = '#FFFFFF';
+                    
+                    // Base
+                    drawRect(ctx, x + 2, y + 32, 16, 3, '#333');
+                    // Bottom section
+                    drawRect(ctx, x + 4, y + 24, 12, 8, coneOrange);
+                    // White stripe
+                    drawRect(ctx, x + 5, y + 22, 10, 3, coneWhite);
+                    // Middle section
+                    drawRect(ctx, x + 6, y + 16, 8, 6, coneOrange);
+                    // White stripe
+                    drawRect(ctx, x + 7, y + 14, 6, 2, coneWhite);
+                    // Top section
+                    drawRect(ctx, x + 8, y + 8, 4, 6, coneOrange);
+                    // Tip
+                    drawRect(ctx, x + 9, y + 4, 2, 4, coneOrange);
+                    break;
             }
         }
         
@@ -1529,7 +1820,12 @@
         }
         
         function createObstacle() {
-            const type = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
+            // Filter obstacles by current level! 🎮
+            const availableObstacles = obstacleTypes.filter(type => 
+                !type.minLevel || type.minLevel <= currentLevel
+            );
+            
+            const type = availableObstacles[Math.floor(Math.random() * availableObstacles.length)];
             
             let yPos;
             if (type.flying) {
@@ -1559,6 +1855,9 @@
             frameCount++;
             bgScroll += gameSpeed;
             distance += 1;
+            
+            // Check for level progression! 🎮
+            checkLevelProgress();
             
             // Duck control
             if (keys['ArrowDown'] || keys['s'] || keys['S']) {
@@ -1648,24 +1947,27 @@
             
             // Create obstacles - MORE FREQUENT as game progresses
             const baseInterval = 80;
-            const speedReduction = Math.floor(gameSpeed * 3);
-            const scoreReduction = Math.floor(score / 100) * 5; // More obstacles every 100 points
-            const finalInterval = Math.max(baseInterval - speedReduction - scoreReduction, 20);
+            // Adjust base interval based on current level to prevent overcrowding
+            const levelSpeedBonus = (currentLevel - 1) * 0.5; // Speed added by levels
+            const adjustedSpeed = gameSpeed - levelSpeedBonus; // Effective speed for calculation
+            
+            const speedReduction = Math.floor(adjustedSpeed * 3);
+            const scoreReduction = Math.floor(score / 150) * 5; // Less aggressive (was 100)
+            const finalInterval = Math.max(baseInterval - speedReduction - scoreReduction, 25); // Higher minimum (was 20)
             
             if (frameCount % finalInterval === 0) {
                 createObstacle();
                 
-                // Chance of double obstacle at higher scores
-                if (score > 200 && Math.random() > 0.7) {
-                    setTimeout(() => createObstacle(), 300);
+                // Chance of double obstacle - more conservative
+                if (score > 250 && Math.random() > 0.75 && currentLevel < 4) { // Not in twin stroller levels!
+                    setTimeout(() => createObstacle(), 400); // More spacing (was 300)
                 }
                 
-                // Chance of triple obstacle at very high scores
-                if (score > 400 && Math.random() > 0.8) {
+                // Chance of triple obstacle - very rare
+                if (score > 500 && Math.random() > 0.85 && currentLevel < 4) {
                     setTimeout(() => {
                         createObstacle();
-                        createObstacle();
-                    }, 200);
+                    }, 250);
                 }
             }
             
@@ -1816,6 +2118,12 @@
                     ctx.fillText('+10 בונוס!', canvas.width / 2, 130);
                 }
             }
+            
+            // Draw weather effects! 🌧️☀️
+            updateAndDrawWeather(ctx);
+            
+            // Draw level announcement! 🎮
+            drawLevelAnnouncement(ctx);
         }
         
         function gameOver() {
