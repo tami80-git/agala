@@ -432,7 +432,7 @@
         let currentLevel = 1;
         let levelJustChanged = false;
         let levelAnnouncementTimer = 0;
-        const LEVEL_DISTANCE = 50; // Every 50 meters = new level (super fast progression!)
+        const LEVEL_DISTANCE = 30; // Every 30 meters = new level (fast and fun!)
         
         const levels = [
             { 
@@ -2157,6 +2157,13 @@
             player.isDucking = false;
             player.height = player.normalHeight;
             player.comboCount = 0;
+            
+            // Reset level system! 🎮
+            currentLevel = 1;
+            levelJustChanged = false;
+            levelAnnouncementTimer = 0;
+            rainDrops = [];
+            puddles = [];
             
             document.getElementById('gameOverScreen').classList.remove('active');
             document.getElementById('score').textContent = 0;
