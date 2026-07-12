@@ -1087,9 +1087,10 @@
             drawRect(ctx, x - 2, y - 3, w + 4, 3, '#2F4F4F');
         }
         
-        function drawPlayer(ctx) {
-            const x = player.x;
-            const y = player.y;
+        function drawPlayer(ctx, pos) {
+            const x = pos ? pos.x : player.x;
+            const y = pos ? pos.y : player.y;
+            const isDucking = pos ? pos.isDucking : player.isDucking;
             const runFrame = Math.floor(frameCount / 6) % 2;
             
             // Check if we're in double stroller level! 👶👶
@@ -1101,7 +1102,7 @@
             // Shadow - bigger for stroller
             drawRect(ctx, x + 2, GROUND_Y - 2, 50 + strollerOffset, 4, 'rgba(0,0,0,0.3)');
             
-            if (player.isDucking) {
+            if (isDucking) {
                 // Ducking pose - horizontal
                 drawRect(ctx, x, y + 20, 40, 20, '#FF1493'); // Body
                 drawRect(ctx, x, y + 15, 15, 15, '#FFD4A0'); // Head
@@ -1868,15 +1869,6 @@
                 player.height = player.normalHeight;
             }
             
-            // Duck control
-            if (keys['ArrowDown'] || keys['s'] || keys['S']) {
-                player.isDucking = true;
-                player.height = player.duckHeight;
-            } else {
-                player.isDucking = false;
-                player.height = player.normalHeight;
-            }
-            
             // Physics
             player.velocityY += GRAVITY;
             player.y += player.velocityY;
@@ -2070,15 +2062,6 @@
             
             // Player
             drawPlayer(ctx);
-            
-            // In-game score panel - retro arcade style
-            // Background panel
-            drawRect(ctx, 10, 10, 200, 90, 'rgba(0,0,0,0.7)');
-            drawRect(ctx, 10, 10, 200, 3, '#FFD700');
-            drawRect(ctx, 10, 97, 200, 3, '#FFD700');
-            
-            // Score is displayed in UI overlay, not drawn on canvas
-            // Keeping only the combo display for special effects
             
             // Combo display if active
             if (player.comboCount >= 3) {
